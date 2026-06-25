@@ -105,12 +105,12 @@
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| Frontend | React 18 + Leaflet | Geospatial heatmap, dashboards |
+| Frontend | React 18 | Geospatial heatmap, dashboards |
 | State | WebSocket (ws://) | Real-time bidirectional data flow |
 | Backend | FastAPI + Uvicorn | REST API + WebSocket server |
 | Agent Framework | Multi-Agent Orchestrator (Python) | Parallel agent fusion pipeline |
 | Knowledge Graph | NetworkX | Zone-equipment-permit relationships |
-| Vector / RAG | Chroma + Sentence Transformers | Regulatory document retrieval |
+| RAG Pipeline | Keyword search over regulatory documents | Compliance checking |
 | Data Generation | NumPy + Pandas | Synthetic industrial data |
 | Simulation | Async event loop | 2-second update cycle |
 
