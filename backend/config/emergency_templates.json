@@ -1,0 +1,42 @@
+{
+  "gas_leak": {
+    "type": "gas_leak",
+    "label": "Gas Leak - Emergency Response",
+    "alert_channels": ["plant_sirens", "slack_safety_channel", "telegram_safety", "sms_managers"],
+    "evacuation_radius": 100,
+    "requires_shutdown": true,
+    "requires_rescue_team": true
+  },
+  "fire": {
+    "type": "fire",
+    "label": "Fire - Emergency Response",
+    "alert_channels": ["plant_sirens", "fire_brigade_pager", "slack_safety_channel", "sms_all"],
+    "evacuation_radius": 200,
+    "requires_shutdown": true,
+    "requires_rescue_team": true
+  },
+  "confined_space_emergency": {
+    "type": "confined_space_emergency",
+    "label": "Confined Space Rescue",
+    "alert_channels": ["local_alarm", "rescue_team_pager", "slack_safety_channel"],
+    "evacuation_radius": 50,
+    "requires_shutdown": false,
+    "requires_rescue_team": true
+  },
+  "explosion": {
+    "type": "explosion",
+    "label": "Explosion - Full Site Emergency",
+    "alert_channels": ["plant_sirens", "fire_brigade_pager", "sms_all", "local_authorities", "district_control"],
+    "evacuation_radius": 500,
+    "requires_shutdown": true,
+    "requires_rescue_team": true
+  },
+  "medical_emergency": {
+    "type": "medical_emergency",
+    "label": "Medical Emergency",
+    "alert_channels": ["slack_safety_channel", "sms_managers", "medical_center_pager"],
+    "evacuation_radius": 0,
+    "requires_shutdown": false,
+    "requires_rescue_team": false
+  }
+}

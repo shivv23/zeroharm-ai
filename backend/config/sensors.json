@@ -1,0 +1,35 @@
+{
+  "types": ["CO", "O2", "H2S", "LEL", "Temperature", "Pressure", "VOC", "NO2"],
+  "defaults": {
+    "CO": {"unit": "ppm", "threshold": 100, "critical": 200, "baseline_range": [5, 30], "update_type": "exponential"},
+    "O2": {"unit": "%", "threshold": 19.0, "critical": 18.0, "baseline_range": [19.5, 21.0], "update_type": "oxygen"},
+    "H2S": {"unit": "ppm", "threshold": 10, "critical": 20, "baseline_range": [0, 2], "update_type": "exponential"},
+    "LEL": {"unit": "%LEL", "threshold": 20, "critical": 40, "baseline_range": [1, 8], "update_type": "exponential"},
+    "Temperature": {"unit": "°C", "threshold": 65, "critical": 85, "baseline_range": [25, 45], "update_type": "temperature"},
+    "Pressure": {"unit": "bar", "threshold": 1.8, "critical": 2.5, "baseline_range": [0.8, 1.2], "update_type": "pressure"},
+    "VOC": {"unit": "ppm", "threshold": 50, "critical": 100, "baseline_range": [0, 5], "update_type": "exponential"},
+    "NO2": {"unit": "ppm", "threshold": 3, "critical": 5, "baseline_range": [0, 0.5], "update_type": "exponential"}
+  },
+  "noise_std": 0.08,
+  "oxygen_noise_std": 0.05,
+  "oxygen_clip_min": 15.0,
+  "oxygen_clip_max": 22.0,
+  "temperature_noise_std": 1.0,
+  "temperature_clip_min": 20,
+  "temperature_clip_max": 120,
+  "pressure_noise_std": 0.03,
+  "pressure_clip_min": 0.5,
+  "pressure_clip_max": 3.0,
+  "exponential_drift_factor": 0.02,
+  "risk_noise_weight": 0.2,
+  "risk_approaching_weight": 0.6,
+  "compound_event_ranges": {
+    "LEL": [22, 38],
+    "CO": [110, 190],
+    "O2": [18.0, 18.9],
+    "VOC": [30, 60]
+  },
+  "compound_event_permit_types": ["Confined Space Entry", "Hot Work"],
+  "compound_event_duration_hours": 4,
+  "compound_event_worker_count": 2
+}

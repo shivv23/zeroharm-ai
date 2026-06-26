@@ -2,6 +2,11 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 import random
 
+from config_loader import get_agent_settings, get_zones
+import constants as C
+
+_compliance_cfg = get_agent_settings()["compliance"]
+_extreme_zones = _compliance_cfg["extreme_risk_zones"]
 
 COMPLIANCE_CHECKLIST = {
     "gas_detection": {
@@ -71,9 +76,9 @@ COMPLIANCE_CHECKLIST = {
 
 
 class QualityComplianceAuditAgent:
-    def __init__(self, agent_id: str = "quality_compliance_1"):
-        self.agent_id = agent_id
-        self.name = "Quality & Compliance Audit Agent"
+    def __init__(self, agent_id: str = None):
+        self.agent_id = agent_id or _compliance_cfg.get("quality_compliance_id", "quality_compliance_1")
+        self.name = C.AGENT_COMPLIANCE
         self.status = "idle"
         self.categories = COMPLIANCE_CHECKLIST
         self.audit_history = []
@@ -85,14 +90,10 @@ class QualityComplianceAuditAgent:
         sensors = plant_state.get("sensors", {})
         zone_risks = plant_state.get("zone_risk_scores", {})
         findings = {
-            "agent_id": self.agent_id,
-            "agent_name": self.name,
+            "agent_id": self.agent_id, "agent_name": self.name,
             "timestamp": datetime.now().isoformat(),
-            "overall_compliance_score": 0.0,
-            "category_scores": {},
-            "violations": [],
-            "observations": [],
-            "critical_findings": [],
+            "overall_compliance_score": 0.0, "category_scores": {},
+            "violations": [], "observations": [], "critical_findings": [],
             "summary": "",
         }
         total_weight = 0
@@ -103,33 +104,30 @@ class QualityComplianceAuditAgent:
             for check in cat_score["checks"]:
                 if not check["passed"] and check["severity"] == "critical":
                     findings["critical_findings"].append({
-                        "category": category["title"],
-                        "check": check["description"],
-                        "standard": category["standard"],
-                        "detail": check.get("detail", ""),
+                        "category": category["title"], "check": check["description"],
+                        "standard": category["standard"], "detail": check.get("detail", ""),
                     })
                 if not check["passed"]:
                     findings["violations"].append({
-                        "category": category["title"],
-                        "check": check["description"],
-                        "standard": category["standard"],
-                        "severity": check["severity"],
+                        "category": category["title"], "check": check["description"],
+                        "standard": category["standard"], "severity": check["severity"],
                     })
                 else:
                     findings["observations"].append({
-                        "category": category["title"],
-                        "check": check["description"],
-                        "status": "passed",
+                        "category": category["title"], "check": check["description"], "status": "passed",
                     })
             weighted_score += cat_score["score"] * cat_score["weight"]
             total_weight += cat_score["weight"]
         findings["overall_compliance_score"] = round(weighted_score / total_weight * 100, 1) if total_weight > 0 else 0
+        audit_count = len(self.audit_history)
+        degradation = min(_compliance_cfg["max_degradation"], audit_count * _compliance_cfg["degradation_per_audit"] + _compliance_cfg["base_degradation"])
+        findings["overall_compliance_score"] = round(max(0, findings["overall_compliance_score"] - degradation), 1)
         critical_count = len(findings["critical_findings"])
         violation_count = len(findings["violations"])
         if critical_count > 0:
             findings["summary"] = f"CRITICAL: {critical_count} critical compliance gaps found. Overall score: {findings['overall_compliance_score']}%"
             findings["severity"] = "critical"
-        elif violation_count > 3:
+        elif violation_count > _compliance_cfg["warning_violation_threshold"]:
             findings["summary"] = f"WARNING: {violation_count} compliance gaps found. Overall score: {findings['overall_compliance_score']}%"
             findings["severity"] = "warning"
         else:
@@ -163,84 +161,75 @@ class QualityComplianceAuditAgent:
         severity = "info"
 
         if check_id == "GD-01":
-            bypass_count = sum(1 for s in sensors.values() if s.get("status") == "critical")
-            passed = bypass_count < 3
+            bypass_count = sum(1 for s in sensors.values() if s.get("status") == C.SENSOR_STATUS_CRITICAL)
+            passed = bypass_count < _compliance_cfg["critical_sensor_bypass_limit"]
             detail = f"{bypass_count} sensors in critical state"
-            severity = "critical" if bypass_count > 5 else "warning" if bypass_count > 2 else "info"
+            severity = "critical" if bypass_count > _compliance_cfg["gd02_critical_threshold"] else "warning" if bypass_count > 2 else "info"
 
         elif check_id == "GD-02":
-            bypassed = [s for s in sensors.values() if s.get("status") in ["warning", "critical"]]
-            passed = len(bypassed) < 5
+            bypassed = [s for s in sensors.values() if s.get("status") in [C.SENSOR_STATUS_WARNING, C.SENSOR_STATUS_CRITICAL]]
+            passed = len(bypassed) < _compliance_cfg["warning_sensor_limit"]
             detail = f"{len(bypassed)} sensors in warning/critical"
-            severity = "critical" if len(bypassed) > 8 else "warning"
+            severity = "critical" if len(bypassed) > _compliance_cfg["gd02_critical_threshold"] else "warning"
 
         elif check_id == "GD-05":
-            extreme_zones = [z for z in ["Z01", "Z02", "Z07"] if zone_risks.get(z, 0) > 0.8]
+            extreme_zones = [z for z in _extreme_zones if zone_risks.get(z, 0) > _compliance_cfg["extreme_risk_zone_threshold"]]
             passed = len(extreme_zones) == 0
             detail = f"{len(extreme_zones)} extreme-risk zones with inadequate coverage"
             severity = "critical" if len(extreme_zones) > 1 else "warning"
 
         elif check_id == "PTW-01":
             critical_permits = [p for p in permits if p.get("risk_level") == "Critical"]
-            passed = len(critical_permits) <= 2
+            passed = len(critical_permits) <= _compliance_cfg["ptw01_critical_permit_limit"]
             detail = f"{len(critical_permits)} critical permits active"
-            severity = "critical" if len(critical_permits) > 3 else "warning"
+            severity = "critical" if len(critical_permits) > _compliance_cfg["ptw01_severity_limit"] else "warning"
 
         elif check_id == "PTW-04":
             zones_with_overlap = {}
             for p in permits:
                 z = p.get("zone_id", "")
-                if z not in zones_with_overlap:
-                    zones_with_overlap[z] = []
-                zones_with_overlap[z].append(p)
+                zones_with_overlap.setdefault(z, []).append(p)
             overlaps = {z: ps for z, ps in zones_with_overlap.items() if len(ps) > 1}
-            passed = len(overlaps) <= 2
+            passed = len(overlaps) <= _compliance_cfg["ptw04_overlap_limit"]
             detail = f"{len(overlaps)} zones with overlapping permits"
-            severity = "critical" if len(overlaps) > 3 else "warning"
+            severity = "critical" if len(overlaps) > _compliance_cfg["ptw04_overlap_critical_limit"] else "warning"
 
         elif check_id == "MS-01":
-            passed = True
-            for p in permits:
-                if p.get("type") == "Lockout-Tagout":
-                    passed = True
-                    break
+            passed = any(p.get("type") == "Lockout-Tagout" for p in permits)
             detail = "LOTO procedures verified"
 
         elif check_id == "EP-01":
-            high_risk_count = sum(1 for v in zone_risks.values() if v > 0.6)
-            passed = high_risk_count <= 3
+            high_risk_count = sum(1 for v in zone_risks.values() if v > _compliance_cfg["ep01_high_risk_threshold"])
+            passed = high_risk_count <= _compliance_cfg["ep01_max_high_risk_zones"]
             detail = f"{high_risk_count} high-risk zones need evacuation plan review"
             severity = "critical" if high_risk_count > 5 else "warning"
 
         elif check_id == "EP-05":
             passed = True
             for p in permits:
-                if p.get("type") == "Hot Work" and p.get("zone_id") in ["Z01", "Z02", "Z07"]:
-                    fire_suppression_ok = zone_risks.get(p["zone_id"], 0) < 0.9
-                    if not fire_suppression_ok:
+                if p.get("type") == "Hot Work" and p.get("zone_id") in _extreme_zones:
+                    if zone_risks.get(p["zone_id"], 0) >= _compliance_cfg["ep05_fire_suppression_risk_limit"]:
                         passed = False
                         detail = f"Fire suppression may be inadequate for hot work in {p.get('zone_name', '')}"
                         severity = "critical"
 
         return {
-            "id": check_id,
-            "description": check["description"],
-            "passed": passed,
-            "detail": detail,
+            "id": check_id, "description": check["description"],
+            "passed": passed, "detail": detail,
             "severity": severity if not passed else "passed",
         }
 
     def get_compliance_trend(self) -> List[Dict]:
-        return self.audit_history[-20:]
+        return self.audit_history[-_compliance_cfg["compliance_trend_max"]:]
 
     def get_actionable_recommendations(self) -> List[str]:
         recs = []
-        for entry in self.audit_history[-3:]:
-            if entry["score"] < 70:
-                recs.append("Schedule comprehensive safety audit within 7 days")
+        for entry in self.audit_history[-_compliance_cfg["recent_audits_for_recs"]:]:
+            if entry["score"] < _compliance_cfg["compliance_warning_score"]:
+                recs.append(C.RECOMMENDATION_TEXTS["compliance_audit"])
                 break
-        recs.append("Review gas detection calibration schedule for extreme-hazard zones (Z01/Z02/Z07)")
-        recs.append("Conduct SIMOPS training for all permit issuers")
-        recs.append("Verify emergency drill schedule for current quarter")
-        recs.append("Review LOTO procedures with maintenance team")
-        return recs[:5]
+        recs.append(C.RECOMMENDATION_TEXTS["gas_detection_cal"])
+        recs.append(C.RECOMMENDATION_TEXTS["simops_training"])
+        recs.append(C.RECOMMENDATION_TEXTS["emergency_drill"])
+        recs.append(C.RECOMMENDATION_TEXTS["loto_review"])
+        return recs[:_compliance_cfg["max_recommendations"]]

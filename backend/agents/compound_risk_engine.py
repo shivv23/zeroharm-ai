@@ -7,6 +7,10 @@ import asyncio
 from .sensor_monitor_agent import SensorMonitorAgent
 from .permit_activity_agent import PermitActivityAgent
 from .maintenance_status_agent import MaintenanceStatusAgent
+from config_loader import get_agent_settings
+import constants as C
+
+_cr = get_agent_settings()["compound_risk"]
 
 
 class AgentState(TypedDict):
@@ -23,7 +27,7 @@ class AgentState(TypedDict):
 
 class CompoundRiskDetectionEngine:
     def __init__(self):
-        self.name = "Compound Risk Detection Engine"
+        self.name = C.AGENT_COMPOUND_RISK
         self.sensor_agent = SensorMonitorAgent()
         self.permit_agent = PermitActivityAgent()
         self.maintenance_agent = MaintenanceStatusAgent()
@@ -46,89 +50,69 @@ class CompoundRiskDetectionEngine:
         maintenance = state.get("maintenance_findings", {}) or {}
         existing_compound = state.get("plant_state", {}).get("compound_risks", None) or []
 
-        sensor_severity = {"normal": 0, "info": 0.1, "warning": 0.4, "high": 0.6, "critical": 1.0}.get(
-            sensor.get("severity", "normal"), 0)
-        permit_severity = {"normal": 0, "info": 0.1, "warning": 0.3, "high": 0.5, "critical": 0.9}.get(
-            permit.get("severity", "normal"), 0)
-        maintenance_severity = {"normal": 0, "info": 0.05, "warning": 0.2, "high": 0.5, "critical": 0.8}.get(
-            maintenance.get("severity", "normal"), 0)
+        sensor_severity = _cr["sensor_severity_weights"].get(sensor.get("severity", C.SENSOR_STATUS_NORMAL), 0)
+        permit_severity = _cr["permit_severity_weights"].get(permit.get("severity", C.SENSOR_STATUS_NORMAL), 0)
+        maintenance_severity = _cr["maintenance_severity_weights"].get(maintenance.get("severity", C.SENSOR_STATUS_NORMAL), 0)
 
-        fused_score = sensor_severity * 0.4 + permit_severity * 0.35 + maintenance_severity * 0.25
+        fused_score = sensor_severity * _cr["fusion_weights"]["sensor"] + permit_severity * _cr["fusion_weights"]["permit"] + maintenance_severity * _cr["fusion_weights"]["maintenance"]
 
         alerts = []
-        critical_sensors = sensor.get("critical_sensors", [])
-        if critical_sensors:
-            for cs in critical_sensors:
-                alerts.append({
-                    "type": "SENSOR_CRITICAL",
-                    "severity": "critical",
-                    "source": "sensor_monitor",
-                    "message": f"{cs['type']} sensor at {cs['value']:.1f}{cs['unit']} in {cs.get('zone_id', 'unknown')}",
-                    "timestamp": datetime.now().isoformat(),
-                })
-        high_risk_permits = permit.get("high_risk_permits", [])
-        for hrp in high_risk_permits:
+        for cs in sensor.get("critical_sensors", []):
             alerts.append({
-                "type": "HIGH_RISK_PERMIT",
-                "severity": "high",
-                "source": "permit_activity",
+                "type": "SENSOR_CRITICAL", "severity": "critical", "source": "sensor_monitor",
+                "message": f"{cs['type']} sensor at {cs['value']:.1f}{cs['unit']} in {cs.get('zone_id', C.UNKNOWN_ZONE)}",
+                "timestamp": datetime.now().isoformat(),
+            })
+        for hrp in permit.get("high_risk_permits", []):
+            alerts.append({
+                "type": "HIGH_RISK_PERMIT", "severity": "high", "source": "permit_activity",
                 "message": f"{hrp['type']} ({hrp['risk_level']}) in {hrp['zone_name']}",
                 "timestamp": datetime.now().isoformat(),
             })
-        overlapping = permit.get("overlapping_zone_permits", [])
-        for ov in overlapping:
-            if len(ov.get("permit_types", [])) > 1:
+        for ov in permit.get("overlapping_zone_permits", []):
+            if len(ov.get("permit_types", [])) > _cr["overlap_min_types"]:
                 types_str = ", ".join(ov["permit_types"])
                 alerts.append({
-                    "type": "PERMIT_OVERLAP",
-                    "severity": "high",
-                    "source": "permit_activity",
+                    "type": "PERMIT_OVERLAP", "severity": "high", "source": "permit_activity",
                     "message": f"Multiple permits ({types_str}) overlapping in {ov['zone_name']} ({ov['zone_id']})",
                     "timestamp": datetime.now().isoformat(),
                 })
-        maint_with_permits = maintenance.get("maintenance_equipment_with_permits", [])
-        for mp in maint_with_permits:
+        for mp in maintenance.get("maintenance_equipment_with_permits", []):
             eq = mp.get("equipment", {})
             alerts.append({
-                "type": "MAINTENANCE_PERMIT_CONFLICT",
-                "severity": "high",
-                "source": "maintenance_status",
+                "type": "MAINTENANCE_PERMIT_CONFLICT", "severity": "high", "source": "maintenance_status",
                 "message": f"Equipment {eq.get('name', '')} in maintenance with active permits in zone {mp.get('zone_id', '')}",
                 "timestamp": datetime.now().isoformat(),
             })
         for ecr in existing_compound:
             alerts.append({
-                "type": "COMPOUND_RISK",
-                "severity": "critical",
-                "source": "compound_risk_engine",
+                "type": "COMPOUND_RISK", "severity": "critical", "source": "compound_risk_engine",
                 "message": ecr.get("recommendation", f"Compound risk in {ecr['zone_name']}"),
-                "zone_id": ecr["zone_id"],
-                "zone_name": ecr["zone_name"],
+                "zone_id": ecr["zone_id"], "zone_name": ecr["zone_name"],
                 "compound_risk_score": ecr.get("compound_risk_score", 0),
-                "permit_type": ecr.get("permit_type", ""),
-                "risks": ecr.get("risks", []),
+                "permit_type": ecr.get("permit_type", ""), "risks": ecr.get("risks", []),
                 "timestamp": datetime.now().isoformat(),
             })
 
         compound_risk_alerts = [a for a in alerts if a["type"] == "COMPOUND_RISK"]
         if compound_risk_alerts:
-            fused_score = max(fused_score, 0.9)
+            fused_score = max(fused_score, _cr["compound_risk_min_score"])
             fused_severity = "critical"
-        elif sensor_severity >= 1.0 or fused_score >= 0.7:
+        elif sensor_severity >= _cr["critical_sensor_severity"] or fused_score >= _cr["critical_fused_threshold"]:
             fused_severity = "critical"
-        elif fused_score >= 0.4:
+        elif fused_score >= _cr["high_fused_threshold"]:
             fused_severity = "high"
-        elif fused_score >= 0.2:
+        elif fused_score >= _cr["warning_fused_threshold"]:
             fused_severity = "warning"
-        elif fused_score >= 0.1:
+        elif fused_score >= _cr["info_fused_threshold"]:
             fused_severity = "info"
         else:
-            fused_severity = "normal"
+            fused_severity = C.SENSOR_STATUS_NORMAL
 
         summary_parts = []
-        if sensor.get("severity") in ["warning", "critical"]:
+        if sensor.get("severity") in [C.SENSOR_STATUS_WARNING, "critical"]:
             summary_parts.append(f"Sensors: {sensor.get('summary', '')}")
-        if permit.get("severity") in ["warning", "high", "critical"]:
+        if permit.get("severity") in [C.SENSOR_STATUS_WARNING, "high", "critical"]:
             summary_parts.append(f"Permits: {permit.get('summary', '')}")
         if maintenance.get("severity") in ["high", "critical"]:
             summary_parts.append(f"Maintenance: {maintenance.get('summary', '')}")
@@ -145,14 +129,9 @@ class CompoundRiskDetectionEngine:
     async def run_async(self, plant_state: Dict) -> Dict:
         state: AgentState = {
             "plant_state": plant_state,
-            "sensor_findings": None,
-            "permit_findings": None,
-            "maintenance_findings": None,
-            "compound_risks": None,
-            "fused_risk_score": None,
-            "fused_severity": None,
-            "fused_alerts": None,
-            "fused_summary": None,
+            "sensor_findings": None, "permit_findings": None, "maintenance_findings": None,
+            "compound_risks": None, "fused_risk_score": None, "fused_severity": None,
+            "fused_alerts": None, "fused_summary": None,
         }
         sensor_task = asyncio.create_task(asyncio.to_thread(self.run_sensor_analysis, state))
         permit_task = asyncio.create_task(asyncio.to_thread(self.run_permit_analysis, state))
@@ -160,16 +139,11 @@ class CompoundRiskDetectionEngine:
         await asyncio.gather(sensor_task, permit_task, maint_task)
         state = self.fuse_and_rank(state)
         return {
-            "risk_score": state["fused_risk_score"],
-            "severity": state["fused_severity"],
-            "alerts": state["fused_alerts"],
-            "summary": state["fused_summary"],
-            "sensor_analysis": state["sensor_findings"],
-            "permit_analysis": state["permit_findings"],
-            "maintenance_analysis": state["maintenance_findings"],
-            "compound_risks": state["compound_risks"],
-            "engine_name": self.name,
-            "timestamp": datetime.now().isoformat(),
+            "risk_score": state["fused_risk_score"], "severity": state["fused_severity"],
+            "alerts": state["fused_alerts"], "summary": state["fused_summary"],
+            "sensor_analysis": state["sensor_findings"], "permit_analysis": state["permit_findings"],
+            "maintenance_analysis": state["maintenance_findings"], "compound_risks": state["compound_risks"],
+            "engine_name": self.name, "timestamp": datetime.now().isoformat(),
         }
 
     def run(self, plant_state: Dict) -> Dict:

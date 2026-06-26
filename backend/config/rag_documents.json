@@ -1,0 +1,38 @@
+{
+  "OISD-STD-105": {
+    "id": "OISD-STD-105",
+    "title": "Fire Protection Facilities for Petroleum Depots, Terminals & Cross Country Pipelines",
+    "content": "This standard provides requirements for fire protection facilities including fire water systems, foam systems, portable extinguishers, and automatic detection systems. Key requirements include: - Fire water storage capacity shall be sufficient for 4 hours of continuous operation - Foam concentrate storage shall be sufficient for the largest single fire scenario - Fixed fire monitors shall be spaced at maximum 15m intervals in process areas - Hydrant spacing shall not exceed 30m in process areas and 45m in storage areas - All fire protection systems shall be tested weekly and maintained as per manufacturer recommendations",
+    "keywords": ["fire protection", "water storage", "foam", "hydrant", "monitor", "testing"]
+  },
+  "OISD-STD-116": {
+    "id": "OISD-STD-116",
+    "title": "Fire Prevention and Protection System for Oil and Gas Installations",
+    "content": "This standard covers design, installation, and maintenance of fire prevention and protection systems. Key requirements include: - Gas detection systems shall be provided in all enclosed process areas - Fire and gas detection systems shall activate audible and visual alarms - Emergency shutdown systems (ESD) shall be fail-safe design - Fireproofing shall be applied to structural supports for vessels containing hydrocarbons - Passive fire protection shall be maintained in good condition at all times",
+    "keywords": ["gas detection", "alarm", "ESD", "fireproofing", "passive protection"]
+  },
+  "OISD-STD-118": {
+    "id": "OISD-STD-118",
+    "title": "Layout Requirements for Oil and Gas Installations",
+    "content": "This standard specifies minimum distances between equipment, storage tanks, and boundaries. Key requirements include: - Minimum 15m between process equipment and ignition sources - Minimum 30m between LPG storage and plant boundary - Access roads shall be minimum 6m wide with turning radius of 12m - Emergency assembly points shall be located at safe distances upwind of process areas - Hazardous area classification drawings shall be maintained and updated",
+    "keywords": ["layout", "spacing", "access", "assembly point", "hazardous area"]
+  },
+  "Factory-Act-1948-Sec36": {
+    "id": "Factory-Act-1948-Sec36",
+    "title": "Precautions Against Dangerous Fumes and Lack of Oxygen in Confined Spaces",
+    "content": "36. No person shall be required to enter any chamber, tank, vat, pit, pipe, flue or other confined space unless it has been certified by a competent person that it is safe to enter. The following precautions shall be observed: (a) The confined space shall be thoroughly ventilated before entry (b) Adequate arrangements shall be made for the testing of the atmosphere for dangerous fumes and oxygen content (c) Suitable breathing apparatus and life belts shall be provided and maintained (d) A person trained in first aid and rescue procedures shall be stationed outside the confined space (e) All electrical equipment used inside confined spaces shall be of approved safety type",
+    "keywords": ["confined space", "oxygen", "fumes", "ventilation", "breathing apparatus", "rescue"]
+  },
+  "Factory-Act-1948-Sec37": {
+    "id": "Factory-Act-1948-Sec37",
+    "title": "Explosive or Inflammable Dust, Gas - Precautions Against Explosions",
+    "content": "37. Where any manufacturing process produces dust, gas, fume or vapour of such character and extent as to be liable to explode on ignition, all practicable measures shall be taken to: (a) Prevent the accumulation of such dust, gas, fume or vapour (b) Exclude all possible sources of ignition (c) Provide and maintain effective appliances for extinguishing any fire (d) Effective measures shall be taken to prevent the explosion by enclosure of the plant and by effective dust and fume extraction systems",
+    "keywords": ["explosion", "ignition", "dust", "gas", "extinguishing", "enclosure"]
+  },
+  "ISO-45001-Clause6": {
+    "id": "ISO-45001-Clause6",
+    "title": "ISO 45001: Planning - Hazard Identification and Risk Assessment",
+    "content": "Clause 6.1: The organization shall establish, implement and maintain a process for hazard identification and OH&S risk assessment. This process shall take into account: a) Routine and non-routine activities and situations b) Emergency situations c) People including workers, contractors, and visitors d) Changes in the organization, operations, or legal requirements The organization shall maintain documented information of hazards, OH&S risks, and actions to address them.",
+    "keywords": ["hazard identification", "risk assessment", "planning", "OH&S"]
+  }
+}

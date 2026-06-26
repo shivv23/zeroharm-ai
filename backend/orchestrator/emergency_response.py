@@ -1,61 +1,29 @@
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-import json
 import uuid
+
+from config_loader import get_emergency_templates, get_regulatory_standards
+import constants as C
 
 
 class EmergencyResponseOrchestrator:
     def __init__(self):
-        self.name = "Emergency Response Orchestrator"
+        self.name = C.AGENT_EMERGENCY
         self.active_emergencies = []
-        self.response_templates = {
-            "gas_leak": {
-                "type": "gas_leak",
-                "label": "Gas Leak - Emergency Response",
-                "alert_channels": ["plant_sirens", "slack_safety_channel", "telegram_safety", "sms_managers"],
-                "evacuation_radius": 100,
-                "requires_shutdown": True,
-                "requires_rescue_team": True,
-            },
-            "fire": {
-                "type": "fire",
-                "label": "Fire - Emergency Response",
-                "alert_channels": ["plant_sirens", "fire_brigade_pager", "slack_safety_channel", "sms_all"],
-                "evacuation_radius": 200,
-                "requires_shutdown": True,
-                "requires_rescue_team": True,
-            },
-            "confined_space_emergency": {
-                "type": "confined_space_emergency",
-                "label": "Confined Space Rescue",
-                "alert_channels": ["local_alarm", "rescue_team_pager", "slack_safety_channel"],
-                "evacuation_radius": 50,
-                "requires_shutdown": False,
-                "requires_rescue_team": True,
-            },
-            "explosion": {
-                "type": "explosion",
-                "label": "Explosion - Full Site Emergency",
-                "alert_channels": ["plant_sirens", "fire_brigade_pager", "sms_all", "local_authorities", "district_control"],
-                "evacuation_radius": 500,
-                "requires_shutdown": True,
-                "requires_rescue_team": True,
-            },
-            "medical_emergency": {
-                "type": "medical_emergency",
-                "label": "Medical Emergency",
-                "alert_channels": ["slack_safety_channel", "sms_managers", "medical_center_pager"],
-                "evacuation_radius": 0,
-                "requires_shutdown": False,
-                "requires_rescue_team": False,
-            },
+        self.response_templates = get_emergency_templates()
+        self.regulatory_refs = {
+            "gas_leak": ["OISD-STD-116 Sec 6.2", "Factory Act 1948 Sec 37", "ISO 45001 Clause 8.2"],
+            "fire": ["OISD-STD-105 Sec 4.0", "OISD-STD-116 Sec 8.0", "Factory Act 1948 Sec 38", "ISO 45001 Clause 8.2"],
+            "confined_space_emergency": ["Factory Act 1948 Sec 36", "OISD-GDN-204", "ISO 45001 Clause 6.1"],
+            "explosion": ["OISD-STD-150", "Factory Act 1948 Sec 37", "DGMS Circular 2024-SC1"],
+            "medical_emergency": ["Factory Act 1948 Sec 7A", "ISO 45001 Clause 7.2"],
         }
 
     def trigger(self, incident_type: str, context: Dict) -> Dict:
-        template = self.response_templates.get(incident_type, self.response_templates["medical_emergency"])
+        template = self.response_templates.get(incident_type, self.response_templates[C.DEFAULT_EMERGENCY_TYPE])
         emergency_id = f"EMR-{uuid.uuid4().hex[:8].upper()}"
-        zone_id = context.get("zone_id", "Unknown")
-        zone_name = context.get("zone_name", "Unknown")
+        zone_id = context.get("zone_id", C.UNKNOWN_LABEL)
+        zone_name = context.get("zone_name", C.UNKNOWN_LABEL)
         timestamp = datetime.now()
         response = {
             "id": emergency_id,
@@ -81,19 +49,17 @@ class EmergencyResponseOrchestrator:
 
         alert_results = []
         for channel in template["alert_channels"]:
-            alert_result = {
-                "channel": channel,
-                "status": "dispatched",
+            alert_results.append({
+                "channel": channel, "status": "dispatched",
                 "message": f"[{emergency_id}] {template['label']} in {zone_name}. Evacuate immediately.",
                 "dispatched_at": datetime.now().isoformat(),
-            }
-            alert_results.append(alert_result)
+            })
             response["timeline"].append({
-                "time": datetime.now().isoformat(),
-                "event": f"Alert dispatched via {channel}",
-                "details": alert_result["message"],
+                "time": datetime.now().isoformat(), "event": f"Alert dispatched via {channel}",
+                "details": alert_results[-1]["message"],
             })
         response["alerts_dispatched"] = alert_results
+
         if template["evacuation_radius"] > 0:
             response["evacuation_status"] = "in_progress"
             response["timeline"].append({
@@ -104,21 +70,19 @@ class EmergencyResponseOrchestrator:
         if template["requires_shutdown"]:
             response["shutdown_initiated"] = True
             response["timeline"].append({
-                "time": datetime.now().isoformat(),
-                "event": "Emergency shutdown sequence initiated",
+                "time": datetime.now().isoformat(), "event": "Emergency shutdown sequence initiated",
                 "details": "Isolating equipment and depressurizing systems in affected zone",
             })
         if template["requires_rescue_team"]:
             response["rescue_team_dispatched"] = True
             response["timeline"].append({
-                "time": datetime.now().isoformat(),
-                "event": "Rescue team dispatched",
+                "time": datetime.now().isoformat(), "event": "Rescue team dispatched",
                 "details": "Trained rescue team with appropriate PPE and equipment en route",
             })
+
         response["incident_report"] = self._generate_incident_report(emergency_id, incident_type, zone_id, zone_name, timestamp, context)
         response["timeline"].append({
-            "time": datetime.now().isoformat(),
-            "event": "Preliminary incident report generated",
+            "time": datetime.now().isoformat(), "event": "Preliminary incident report generated",
             "details": "Regulatory-compliant report prepared for submission",
         })
         response["status"] = "active"
@@ -128,23 +92,21 @@ class EmergencyResponseOrchestrator:
     def _generate_incident_report(self, emergency_id: str, incident_type: str, zone_id: str,
                                    zone_name: str, timestamp: datetime, context: Dict) -> Dict:
         sensor_snapshot = context.get("sensor_snapshot", {})
-        sensor_table = []
-        for sid, sdata in sensor_snapshot.items():
-            sensor_table.append(f"{sdata.get('type', 'N/A')}: {sdata.get('value', 'N/A')} {sdata.get('unit', '')} ({sdata.get('status', 'N/A')})")
+        sensor_table = [f"{sdata.get('type', 'N/A')}: {sdata.get('value', 'N/A')} {sdata.get('unit', '')} ({sdata.get('status', 'N/A')})" for sid, sdata in sensor_snapshot.items()]
         permit_snapshot = context.get("permit_snapshot", [])
         permit_table = [f"{p.get('id', 'N/A')} - {p.get('type', 'N/A')} ({p.get('risk_level', 'N/A')})" for p in permit_snapshot]
         return {
             "report_id": f"IR-{emergency_id}",
             "generated_at": datetime.now().isoformat(),
             "status": "preliminary",
-            "classification": "CONFIDENTIAL - FOR REGULATORY SUBMISSION",
+            "classification": C.INCIDENT_REPORT_CLASSIFICATION,
             "details": {
                 "emergency_id": emergency_id,
                 "incident_type": incident_type.upper().replace("_", " "),
                 "location": f"Zone {zone_id} - {zone_name}",
                 "date": timestamp.strftime("%Y-%m-%d"),
                 "time": timestamp.strftime("%H:%M:%S IST"),
-                "reporting_officer": "Auto-generated by ZeroHarm AI Emergency Response System",
+                "reporting_officer": C.REPORTING_OFFICER_LABEL,
                 "regulatory_references": self._get_regulatory_refs(incident_type),
             },
             "sensor_evidence": sensor_table,
@@ -165,14 +127,7 @@ class EmergencyResponseOrchestrator:
         }
 
     def _get_regulatory_refs(self, incident_type: str) -> List[str]:
-        refs = {
-            "gas_leak": ["OISD-STD-116 Sec 6.2", "Factory Act 1948 Sec 37", "ISO 45001 Clause 8.2"],
-            "fire": ["OISD-STD-105 Sec 4.0", "OISD-STD-116 Sec 8.0", "Factory Act 1948 Sec 38", "ISO 45001 Clause 8.2"],
-            "confined_space_emergency": ["Factory Act 1948 Sec 36", "OISD-GDN-204", "ISO 45001 Clause 6.1"],
-            "explosion": ["OISD-STD-150", "Factory Act 1948 Sec 37", "DGMS Circular 2024-SC1"],
-            "medical_emergency": ["Factory Act 1948 Sec 7A", "ISO 45001 Clause 7.2"],
-        }
-        return refs.get(incident_type, ["Factory Act 1948", "ISO 45001"])
+        return self.regulatory_refs.get(incident_type, ["Factory Act 1948", "ISO 45001"])
 
     def resolve(self, emergency_id: str, resolution_notes: str = "") -> Optional[Dict]:
         for i, em in enumerate(self.active_emergencies):
@@ -181,8 +136,7 @@ class EmergencyResponseOrchestrator:
                 self.active_emergencies[i]["resolved_at"] = datetime.now().isoformat()
                 self.active_emergencies[i]["resolution_notes"] = resolution_notes
                 self.active_emergencies[i]["timeline"].append({
-                    "time": datetime.now().isoformat(),
-                    "event": "Emergency resolved",
+                    "time": datetime.now().isoformat(), "event": "Emergency resolved",
                     "details": resolution_notes or "All clear declared",
                 })
                 return self.active_emergencies[i]

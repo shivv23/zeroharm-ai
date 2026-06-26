@@ -19,8 +19,9 @@ def test_knowledge_graph():
     print("Testing Knowledge Graph...")
     from knowledge_graph.kg_builder import IndustrialKnowledgeGraph
     kg = IndustrialKnowledgeGraph()
-    from data.synthetic_data_generator import PLANT_ZONES
-    for z in PLANT_ZONES[:3]:
+    from config_loader import get_zones
+    zones = get_zones()
+    for z in zones[:3]:
         kg.add_zone(z["id"], z["name"], z["hazard_class"], z["x"], z["y"])
     findings = kg.query_compound_risk_paths("Z01", ["Confined Space Entry"], {"O2": 18.2})
     assert len(findings) > 0, "Expected compound risk findings"

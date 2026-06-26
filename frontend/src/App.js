@@ -24,6 +24,40 @@ const TABS = [
   { id: 'patterns', label: 'Patterns', icon: '\u{1F50D}' },
 ];
 
+const SEVERITY_SCORE = { critical: 4, high: 3, warning: 2, info: 1 };
+const ALERT_FREQUENCY_HZ = 880;
+const ALERT_GAIN = 0.1;
+const ALERT_DURATION_S = 0.5;
+const TOAST_DEFAULT_DURATION = 5000;
+const TOAST_SUCCESS_DURATION = 3000;
+const TOAST_CRITICAL_DURATION = 8000;
+const TOAST_WARNING_DURATION = 5000;
+const TOAST_EMERGENCY_DURATION = 10000;
+const TOAST_SCENARIO_DURATION = 4000;
+const NARROW_THRESHOLD = 1100;
+const MINI_CHART_WIDTH = 80;
+const MINI_CHART_HEIGHT = 24;
+const SIDE_PANEL_NARROW = 240;
+const SIDE_PANEL_WIDE = 340;
+
+const COLOR_HEALTH_GOOD = '#00e676';
+const COLOR_HEALTH_WARN = '#ffa000';
+const COLOR_HEALTH_CRIT = '#ff1744';
+const COLOR_STATUS_OFFLINE = '#6b7280';
+const COLOR_BG_LOW_RISK = 'rgba(0,230,118,0.15)';
+const COLOR_BG_MED_RISK = 'rgba(255,160,0,0.2)';
+const COLOR_BG_HIGH_RISK = 'rgba(255,23,68,0.2)';
+const COLOR_BORDER_LOW_RISK = 'rgba(0,230,118,0.3)';
+const COLOR_BORDER_MED_RISK = 'rgba(255,160,0,0.4)';
+const COLOR_BORDER_HIGH_RISK = 'rgba(255,23,68,0.4)';
+const COLOR_TEXT_MUTED = '#6b7280';
+const COLOR_TEXT_DIM = '#4b5563';
+const COLOR_ACCENT_CYAN = '#00e5ff';
+const COLOR_BG_PRIMARY = '#080c16';
+const COLOR_BG_HEADER = '#0d1520';
+const COLOR_BORDER_DARK = '#1f2937';
+const COLOR_BORDER_TAB = '#1a2332';
+
 let toastId = 0;
 
 export default function App() {
@@ -48,7 +82,7 @@ export default function App() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const isNarrow = windowWidth < 1100;
+  const isNarrow = windowWidth < NARROW_THRESHOLD;
   const prevSeverity = useRef('normal');
   const prevAlertCount = useRef(0);
   const audioCtx = useRef(null);
@@ -61,16 +95,16 @@ export default function App() {
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.frequency.value = 880;
+      osc.frequency.value = ALERT_FREQUENCY_HZ;
       osc.type = 'square';
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      gain.gain.setValueAtTime(ALERT_GAIN, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + ALERT_DURATION_S);
       osc.start();
-      osc.stop(ctx.currentTime + 0.5);
+      osc.stop(ctx.currentTime + ALERT_DURATION_S);
     } catch (e) { /* audio not available */ }
   }, []);
 
-  const addToast = useCallback((message, type = 'info', duration = 5000) => {
+  const addToast = useCallback((message, type = 'info', duration = TOAST_DEFAULT_DURATION) => {
     const id = ++toastId;
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), duration);
@@ -80,7 +114,7 @@ export default function App() {
     ws.connect();
     const unsub1 = ws.on('connection', (d) => {
       setConnected(d.connected);
-      if (d.connected) addToast('Connected to ZeroHarm AI platform', 'success', 3000);
+      if (d.connected) addToast('Connected to ZeroHarm AI platform', 'success', TOAST_SUCCESS_DURATION);
     });
     const unsub2 = ws.on('state_update', (d) => {
       setPlantState(d.plant);
@@ -94,30 +128,30 @@ export default function App() {
       const severity = d.risk?.severity || 'normal';
       const alertCount = d.risk?.alerts?.length || 0;
       if (severity === 'critical' && prevSeverity.current !== 'critical') {
-        addToast('CRITICAL: Compound risk condition detected!', 'critical', 8000);
+        addToast('CRITICAL: Compound risk condition detected!', 'critical', TOAST_CRITICAL_DURATION);
         playAlertSound();
       }
       if (alertCount > prevAlertCount.current + 2) {
-        addToast(`${alertCount} active alerts — review recommended`, 'warning', 5000);
+        addToast(`${alertCount} active alerts — review recommended`, 'warning', TOAST_WARNING_DURATION);
       }
       prevSeverity.current = severity;
       prevAlertCount.current = alertCount;
     });
     const unsub3 = ws.on('emergency_triggered', () => {
       setShowEmergencyModal(true);
-      addToast('EMERGENCY RESPONSE ACTIVATED', 'critical', 10000);
+      addToast('EMERGENCY RESPONSE ACTIVATED', 'critical', TOAST_EMERGENCY_DURATION);
     });
     const unsub4 = ws.on('what_if_applied', (d) => {
       if (d.plant) setPlantState(d.plant);
       if (d.risk) setRiskData(d.risk);
       if (d.activity) setActivityFeed(d.activity);
-      addToast('What-If scenario applied', 'warning', 4000);
+      addToast('What-If scenario applied', 'warning', TOAST_SCENARIO_DURATION);
     });
     const unsub5 = ws.on('what_if_reset', (d) => {
       if (d.plant) setPlantState(d.plant);
       if (d.risk) setRiskData(d.risk);
       if (d.activity) setActivityFeed(d.activity);
-      addToast('Scenario reset — normal operations', 'success', 4000);
+      addToast('Scenario reset — normal operations', 'success', TOAST_SCENARIO_DURATION);
     });
     return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); ws.disconnect(); };
   }, [addToast]);
@@ -131,8 +165,7 @@ export default function App() {
   }, []);
 
   const topAlert = alerts.length > 0 ? alerts.reduce((a, b) => {
-    const s = { critical: 4, high: 3, warning: 2, info: 1 };
-    return (s[a.severity] || 0) > (s[b.severity] || 0) ? a : b;
+    return (SEVERITY_SCORE[a.severity] || 0) > (SEVERITY_SCORE[b.severity] || 0) ? a : b;
   }) : null;
 
   const riskScore = riskData?.risk_score ?? 0;
@@ -154,7 +187,7 @@ export default function App() {
           <div style={styles.healthBadge}>
             <div style={{
               ...styles.healthDot,
-              background: healthIndex ? (healthIndex.overall >= 70 ? '#00e676' : healthIndex.overall >= 50 ? '#ffa000' : '#ff1744') : '#6b7280'
+              background: healthIndex ? (healthIndex.overall >= 70 ? COLOR_HEALTH_GOOD : healthIndex.overall >= 50 ? COLOR_HEALTH_WARN : COLOR_HEALTH_CRIT) : COLOR_STATUS_OFFLINE
             }} />
             <span style={styles.healthText}>
               {healthIndex ? `${healthIndex.overall}% ${healthIndex.label}` : 'Loading...'}
@@ -163,21 +196,21 @@ export default function App() {
         </div>
         <div style={styles.headerRight}>
           {riskTrend.length > 1 && (
-            <div style={{ width: 80, height: 24 }}>
-              <RiskTrendChart data={riskTrend} width={80} height={24} mini />
+            <div style={{ width: MINI_CHART_WIDTH, height: MINI_CHART_HEIGHT }}>
+              <RiskTrendChart data={riskTrend} width={MINI_CHART_WIDTH} height={MINI_CHART_HEIGHT} mini />
             </div>
           )}
           <div style={styles.headerDivider} />
           <div style={{
             ...styles.riskIndicator,
-            background: riskScore > 0.6 ? 'rgba(255,23,68,0.2)' : riskScore > 0.3 ? 'rgba(255,160,0,0.2)' : 'rgba(0,230,118,0.15)',
-            border: `1px solid ${riskScore > 0.6 ? 'rgba(255,23,68,0.4)' : riskScore > 0.3 ? 'rgba(255,160,0,0.4)' : 'rgba(0,230,118,0.3)'}`,
+            background: riskScore > 0.6 ? COLOR_BG_HIGH_RISK : riskScore > 0.3 ? COLOR_BG_MED_RISK : COLOR_BG_LOW_RISK,
+            border: `1px solid ${riskScore > 0.6 ? COLOR_BORDER_HIGH_RISK : riskScore > 0.3 ? COLOR_BORDER_MED_RISK : COLOR_BORDER_LOW_RISK}`,
           }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: getRiskColor(riskScore) }}>{(riskScore * 100).toFixed(0)}</span>
-            <span style={{ fontSize: 9, color: '#6b7280', marginLeft: 2 }}>/100</span>
+            <span style={{ fontSize: 9, color: COLOR_TEXT_MUTED, marginLeft: 2 }}>/100</span>
           </div>
           <div style={styles.connectionStatus}>
-            <div style={{ ...styles.statusDot, background: connected ? '#00e676' : '#ff1744',
+            <div style={{ ...styles.statusDot, background: connected ? COLOR_HEALTH_GOOD : COLOR_HEALTH_CRIT,
                           boxShadow: connected ? '0 0 8px rgba(0,230,118,0.5)' : 'none' }} />
             <span style={styles.statusText}>{connected ? 'Live' : 'Offline'}</span>
           </div>
@@ -195,7 +228,7 @@ export default function App() {
             {TABS.map(t => (
               <div key={t.id}
                    style={{ ...styles.tab, ...(activeTab === t.id ? styles.activeTab : {}),
-                            ...(t.id === 'emergency' ? { color: activeTab === 'emergency' ? '#ff1744' : '#6b7280' } : {}) }}
+                            ...(t.id === 'emergency' ? { color: activeTab === 'emergency' ? COLOR_HEALTH_CRIT : COLOR_TEXT_MUTED } : {}) }}
                    onClick={() => setActiveTab(t.id)}>
                 <span style={{ marginRight: 5 }}>{t.icon}</span>
                 {t.label}
@@ -217,7 +250,7 @@ export default function App() {
             {activeTab === 'patterns' && <IncidentPatterns />}
           </div>
         </div>
-        <div style={{...styles.sidePanel, width: isNarrow ? 240 : 340}}>
+        <div style={{...styles.sidePanel, width: isNarrow ? SIDE_PANEL_NARROW : SIDE_PANEL_WIDE}}>
           <RiskPanel riskData={riskData} zoneRisks={zoneRisks} selectedZone={selectedZone}
             plantState={plantState} riskTrend={riskTrend} compliance={compliance}
             onEmergency={() => setActiveTab('emergency')} />
@@ -228,28 +261,28 @@ export default function App() {
 }
 
 const styles = {
-  container: { display: 'flex', flexDirection: 'column', height: '100vh', background: '#080c16', color: '#e0e5ec' },
+  container: { display: 'flex', flexDirection: 'column', height: '100vh', background: COLOR_BG_PRIMARY, color: '#e0e5ec' },
   header: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     padding: '0 20px', background: 'linear-gradient(135deg, #0d1520 0%, #111827 100%)',
-    borderBottom: '1px solid #1f2937', height: 50, flexShrink: 0,
+    borderBottom: `1px solid ${COLOR_BORDER_DARK}`, height: 50, flexShrink: 0,
   },
   headerLeft: { display: 'flex', alignItems: 'center', gap: 16 },
   logo: { display: 'flex', alignItems: 'center', gap: 10 },
   shieldIcon: { fontSize: 24 },
   title: { fontSize: 17, fontWeight: 700, background: 'linear-gradient(90deg, #00e5ff, #00bcd4)',
            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: 0.5 },
-  subtitle: { fontSize: 10, color: '#4b5563' },
-  headerDivider: { width: 1, height: 28, background: '#1f2937' },
+  subtitle: { fontSize: 10, color: COLOR_TEXT_DIM },
+  headerDivider: { width: 1, height: 28, background: COLOR_BORDER_DARK },
   healthBadge: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px',
-                 background: 'rgba(0,0,0,0.3)', borderRadius: 12, border: '1px solid #1f2937' },
+                 background: 'rgba(0,0,0,0.3)', borderRadius: 12, border: `1px solid ${COLOR_BORDER_DARK}` },
   healthDot: { width: 6, height: 6, borderRadius: '50%' },
   healthText: { fontSize: 11, color: '#9ca3af' },
   headerRight: { display: 'flex', alignItems: 'center', gap: 12 },
   riskIndicator: { display: 'flex', alignItems: 'center', gap: 2, padding: '4px 10px', borderRadius: 8 },
   connectionStatus: { display: 'flex', alignItems: 'center', gap: 6 },
   statusDot: { width: 7, height: 7, borderRadius: '50%' },
-  statusText: { fontSize: 11, color: '#6b7280' },
+  statusText: { fontSize: 11, color: COLOR_TEXT_MUTED },
   criticalBadge: {
     background: 'linear-gradient(135deg, #ff1744, #d50000)', color: '#fff',
     padding: '2px 10px', borderRadius: 10, fontSize: 10, fontWeight: 700,
@@ -258,19 +291,19 @@ const styles = {
   main: { display: 'flex', flex: 1, overflow: 'hidden' },
   contentArea: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 },
   tabBar: {
-    display: 'flex', background: '#0d1520', borderBottom: '1px solid #1a2332',
+    display: 'flex', background: COLOR_BG_HEADER, borderBottom: `1px solid ${COLOR_BORDER_TAB}`,
     padding: '0 8px', gap: 1, flexShrink: 0, overflowX: 'auto',
   },
   tab: {
-    padding: '9px 14px', cursor: 'pointer', fontSize: 12, color: '#4b5563',
+    padding: '9px 14px', cursor: 'pointer', fontSize: 12, color: COLOR_TEXT_DIM,
     borderBottom: '2px solid transparent', transition: 'all 0.2s', userSelect: 'none',
     display: 'flex', alignItems: 'center', whiteSpace: 'nowrap',
     fontFamily: "'SF Mono', 'Fira Code', monospace",
   },
   activeTab: {
-    color: '#00e5ff', borderBottomColor: '#00e5ff',
+    color: COLOR_ACCENT_CYAN, borderBottomColor: COLOR_ACCENT_CYAN,
     background: 'linear-gradient(0deg, rgba(0,229,255,0.06) 0%, transparent 100%)',
   },
   tabContent: { flex: 1, overflow: 'auto', position: 'relative' },
-  sidePanel: { flexShrink: 0, borderLeft: '1px solid #1a2332', overflow: 'auto' },
+  sidePanel: { flexShrink: 0, borderLeft: `1px solid ${COLOR_BORDER_TAB}`, overflow: 'auto' },
 };

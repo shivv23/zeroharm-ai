@@ -1,0 +1,116 @@
+{
+  "compliance": {
+    "max_degradation": 12.0,
+    "degradation_per_audit": 0.4,
+    "base_degradation": 3.0,
+    "warning_violation_threshold": 3,
+    "critical_sensor_bypass_limit": 3,
+    "warning_sensor_limit": 5,
+    "gd02_critical_threshold": 8,
+    "extreme_risk_zones": ["Z01", "Z02", "Z07"],
+    "extreme_risk_zone_threshold": 0.8,
+    "ptw01_critical_permit_limit": 2,
+    "ptw01_severity_limit": 3,
+    "ptw04_overlap_limit": 2,
+    "ptw04_overlap_critical_limit": 3,
+    "ep01_high_risk_threshold": 0.6,
+    "ep01_max_high_risk_zones": 3,
+    "ep05_fire_suppression_risk_limit": 0.9,
+    "compliance_trend_max": 20,
+    "recent_audits_for_recs": 3,
+    "compliance_warning_score": 70,
+    "max_recommendations": 5
+  },
+  "agents": {
+    "sensor_monitor_id": "sensor_monitor_1",
+    "permit_activity_id": "permit_activity_1",
+    "maintenance_agent_id": "maintenance_agent_1",
+    "quality_compliance_id": "quality_compliance_1"
+  },
+  "compound_risk": {
+    "sensor_severity_weights": {"normal": 0, "info": 0.1, "warning": 0.4, "high": 0.6, "critical": 1.0},
+    "permit_severity_weights": {"normal": 0, "info": 0.1, "warning": 0.3, "high": 0.5, "critical": 0.9},
+    "maintenance_severity_weights": {"normal": 0, "info": 0.05, "warning": 0.2, "high": 0.5, "critical": 0.8},
+    "fusion_weights": {"sensor": 0.4, "permit": 0.35, "maintenance": 0.25},
+    "overlap_min_types": 1,
+    "compound_risk_min_score": 0.9,
+    "critical_fused_threshold": 0.7,
+    "critical_sensor_severity": 1.0,
+    "high_fused_threshold": 0.4,
+    "warning_fused_threshold": 0.2,
+    "info_fused_threshold": 0.1
+  },
+  "activity_feed": {
+    "max_entries": 100,
+    "default_recent_count": 20,
+    "recommendation_truncate_length": 80,
+    "high_risk_critical_threshold": 2,
+    "compliance_violation_warning": 3
+  },
+  "synthetic_data": {
+    "random_seed": 42,
+    "permit_generation_prob": 0.15,
+    "permit_min_hours": 1,
+    "permit_max_hours": 8,
+    "min_workers": 1,
+    "max_workers": 4,
+    "compound_event_prob": 0.05,
+    "compound_event_timer": 10,
+    "permit_risk_critical": 0.5,
+    "permit_risk_high": 0.3,
+    "permit_risk_medium": 0.15,
+    "compound_event_boost": 0.3,
+    "zone_risk_sensor_weight": 0.5,
+    "zone_risk_permit_weight": 0.3,
+    "zone_risk_baseline_weight": 0.15,
+    "compound_risk_score_weight": 0.5,
+    "compound_risk_severity_weights": {
+      "confined_space_o2": 0.4,
+      "confined_space_lel": 0.3,
+      "confined_space_h2s": 0.3,
+      "hot_work_lel": 0.5,
+      "hot_work_voc": 0.3,
+      "height_work_temp": 0.3
+    },
+    "compound_risk_severity_threshold": 0.3,
+    "compound_risk_baseline_multiplier": 0.3,
+    "equipment_per_zone_min": 3,
+    "equipment_per_zone_max": 6,
+    "failure_prob_min": 0.01,
+    "failure_prob_max": 0.15,
+    "maintenance_zones": ["Z01", "Z02", "Z03", "Z04", "Z05", "Z06", "Z07"],
+    "equipment_types": ["Pump", "Valve", "Compressor", "Tank", "Heat Exchanger", "Conveyor", "Fan", "Boiler"]
+  },
+  "rag_pipeline": {
+    "keyword_match_score": 0.3,
+    "title_match_score": 0.5,
+    "content_match_score": 0.2,
+    "best_practice_title_score": 0.4,
+    "best_practice_content_score": 0.2,
+    "best_practice_permit_type_score": 0.3,
+    "hot_work_lel_limit": 10,
+    "hot_work_voc_limit": 25,
+    "o2_safe_lower": 19.5,
+    "o2_safe_upper": 23.5,
+    "h2s_safe_limit": 5,
+    "height_work_temp_limit": 50,
+    "default_top_k": 3,
+    "default_emergency_type": "medical_emergency"
+  },
+  "knowledge_graph": {
+    "risk_patterns": {
+      "confined_space_o2_threshold": 19.0,
+      "hot_work_lel_threshold": 10.0,
+      "confined_space_h2s_threshold": 5.0,
+      "confined_space_lel_threshold": 10.0,
+      "hot_work_co_threshold": 50.0
+    }
+  },
+  "incident_patterns": {
+    "severity_order": {"catastrophic": 5, "critical": 4, "major": 3, "moderate": 2, "near_miss": 1},
+    "severity_labels": {"5": "CRITICAL", "4": "HIGH", "3": "MEDIUM", "2": "LOW", "1": "INFO"},
+    "top_causes_limit": 5,
+    "max_prevention_recs": 5,
+    "pattern_sort_order": {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
+  }
+}

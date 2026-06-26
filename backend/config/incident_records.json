@@ -1,0 +1,98 @@
+[
+  {
+    "id": "INC-2023-001",
+    "date": "2023-03-15",
+    "type": "gas_leak",
+    "zone": "Coke Oven Battery",
+    "description": "CO gas leak during coke pushing operation. 3 workers hospitalized due to gas inhalation.",
+    "root_cause": "Inadequate maintenance of gas collection system. Seal failure on coke oven door.",
+    "contributing_factors": ["Preventive maintenance overdue by 45 days", "No continuous gas monitoring in area", "Workers not wearing portable gas detectors"],
+    "regulatory_action": "Show cause notice issued under Factory Act 1948 Sec 37",
+    "severity": "major",
+    "lessons": "Ensure continuous CO monitoring in coke oven battery area. Mandatory portable gas detectors."
+  },
+  {
+    "id": "INC-2023-002",
+    "date": "2023-07-22",
+    "type": "confined_space",
+    "zone": "Blast Furnace Area",
+    "description": "Worker collapsed inside blast furnace tuyere during inspection. Rescued by emergency team.",
+    "root_cause": "Confined space permit issued without atmospheric testing. O2 level was 17.2%.",
+    "contributing_factors": ["Permit issuer did not verify atmospheric test results", "Standby personnel not present", "No ventilation established before entry"],
+    "regulatory_action": "Penalty under Factory Act 1948 Sec 36. Plant management fined Rs 5 Lakh.",
+    "severity": "critical",
+    "lessons": "Mandatory O2 and LEL testing before confined space entry. Two-person rule for all confined space work."
+  },
+  {
+    "id": "INC-2024-001",
+    "date": "2024-01-10",
+    "type": "fire",
+    "zone": "Gas Holder Area",
+    "description": "Fire broke out near gas holder during hot work maintenance. Contained within 20 minutes.",
+    "root_cause": "Hot work permit issued 15m from gas holder without gas test. LEL of 12% detected post-incident.",
+    "contributing_factors": ["SIMOPS review not conducted", "Fire watch not posted", "Gas detection system was in bypass mode for maintenance"],
+    "regulatory_action": "Investigation under OISD-STD-116. Recommendations issued for LOTO procedures.",
+    "severity": "major",
+    "lessons": "No hot work within 30m of gas holders. Gas detection bypass requires special approval and continuous monitoring."
+  },
+  {
+    "id": "INC-2024-002",
+    "date": "2024-04-05",
+    "type": "near_miss",
+    "zone": "Continuous Casting",
+    "description": "Molten steel spill near water cooling lines. Potential steam explosion averted by quick response.",
+    "root_cause": "Ladle refractory failure due to inadequate pre-heating procedure.",
+    "contributing_factors": ["Temperature monitoring system not calibrated", "Operator bypassed pre-heat alarm", "No spare refractory available"],
+    "regulatory_action": "Internal investigation only. No regulatory action.",
+    "severity": "near_miss",
+    "lessons": "Temperature monitoring calibration schedule to be strictly followed. Alarm bypass requires supervisor authorization."
+  },
+  {
+    "id": "INC-2024-003",
+    "date": "2024-08-18",
+    "type": "gas_leak",
+    "zone": "Coke Oven Battery",
+    "description": "H2S gas leak during coke oven charging. 15 workers evacuated. No injuries.",
+    "root_cause": "Charging hole cover not properly sealed. Coal charging sequence disrupted causing gas release.",
+    "contributing_factors": ["Shift changeover communication failure", "Charging sequence not followed as per SOP", "Gas alarms not responded to for 4 minutes"],
+    "regulatory_action": "Plant issued improvement notice under Factory Act.",
+    "severity": "moderate",
+    "lessons": "Shift changeover protocols to include safety-critical equipment status. Gas alarm response time target: <60 seconds."
+  },
+  {
+    "id": "INC-2025-001",
+    "date": "2025-01-20",
+    "type": "explosion",
+    "zone": "Coke Oven Battery",
+    "description": "EXPLOSION in coke oven battery. 8 workers killed, 12 injured. Entrapped gases ignited during maintenance.",
+    "root_cause": "Gas pressure sensors showed warning signals but no intelligence layer connected readings to operational decisions. Maintenance activity proceeded despite abnormal gas accumulation.",
+    "contributing_factors": ["Permit-to-work issued without checking real-time sensor data", "Gas detection system alarms were silenced due to frequent false alarms", "Maintenance supervisor not informed of gas pressure anomalies", "No cross-referencing between permit system and SCADA data"],
+    "regulatory_action": "DGMS and Factory Inspectorate investigation. Plant operations suspended.",
+    "severity": "catastrophic",
+    "lessons": "PROFOUND: Sensor data without intelligence layer is noise. Compound risk detection (permit + gas + maintenance) could have prevented this. NEVER silence alarms without investigating root cause."
+  },
+  {
+    "id": "INC-2025-002",
+    "date": "2025-05-12",
+    "type": "near_miss",
+    "zone": "Hot Rolling Mill",
+    "description": "Roller bearing seized causing coil ejection. No injuries but equipment damage of Rs 2 Cr.",
+    "root_cause": "Lubrication system failure. Vibration sensor data showed trend for 72 hours but no action taken.",
+    "contributing_factors": ["Predictive maintenance alerts ignored", "Spare bearing not in inventory", "Operator training gap on vibration analysis"],
+    "regulatory_action": "None (internal).",
+    "severity": "moderate",
+    "lessons": "Predictive maintenance alerts must have escalation protocol if not acknowledged within 24 hours."
+  },
+  {
+    "id": "INC-2025-003",
+    "date": "2025-09-01",
+    "type": "confined_space",
+    "zone": "Raw Material Yard",
+    "description": "Worker overcome by nitrogen atmosphere in bin during cleaning. Fatal.",
+    "root_cause": "Lockout-Tagout not properly applied. Nitrogen purge line was not isolated.",
+    "contributing_factors": ["LOTO procedure not followed", "No atmospheric testing before entry", "Permit did not specify nitrogen hazard", "Standby personnel untrained in rescue"],
+    "regulatory_action": "Criminal case filed under Factory Act 1948. Safety officer arrested.",
+    "severity": "catastrophic",
+    "lessons": "LOTO verification must include cross-check by second qualified person. Never rely on single-person verification."
+  }
+]

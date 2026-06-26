@@ -1,0 +1,12 @@
+[
+  {"id": "Z01", "name": "Coke Oven Battery", "x": 0.1, "y": 0.15, "width": 0.25, "height": 0.2, "hazard_class": "Extreme", "risk_baseline": 0.85},
+  {"id": "Z02", "name": "Blast Furnace Area", "x": 0.45, "y": 0.1, "width": 0.2, "height": 0.3, "hazard_class": "Extreme", "risk_baseline": 0.9},
+  {"id": "Z03", "name": "BOS / Steelmaking", "x": 0.75, "y": 0.15, "width": 0.2, "height": 0.25, "hazard_class": "High", "risk_baseline": 0.7},
+  {"id": "Z04", "name": "Continuous Casting", "x": 0.1, "y": 0.45, "width": 0.3, "height": 0.2, "hazard_class": "Medium", "risk_baseline": 0.4},
+  {"id": "Z05", "name": "Hot Rolling Mill", "x": 0.55, "y": 0.5, "width": 0.35, "height": 0.2, "hazard_class": "High", "risk_baseline": 0.65},
+  {"id": "Z06", "name": "Raw Material Yard", "x": 0.05, "y": 0.75, "width": 0.25, "height": 0.2, "hazard_class": "Medium", "risk_baseline": 0.35},
+  {"id": "Z07", "name": "Gas Holder Area", "x": 0.7, "y": 0.75, "width": 0.25, "height": 0.2, "hazard_class": "Extreme", "risk_baseline": 0.9},
+  {"id": "Z08", "name": "Central Control Room", "x": 0.4, "y": 0.38, "width": 0.12, "height": 0.1, "hazard_class": "Low", "risk_baseline": 0.05},
+  {"id": "Z09", "name": "Maintenance Workshop", "x": 0.4, "y": 0.75, "width": 0.2, "height": 0.15, "hazard_class": "Low", "risk_baseline": 0.15},
+  {"id": "Z10", "name": "Cooling Tower Area", "x": 0.1, "y": 0.3, "width": 0.15, "height": 0.12, "hazard_class": "Low", "risk_baseline": 0.1}
+]

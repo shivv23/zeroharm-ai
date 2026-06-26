@@ -1,0 +1,27 @@
+[
+  {
+    "title": "Hot Work Near Combustibles",
+    "content": "Hot work permits require that all combustible materials within 11m of the work area be moved or covered with fire-resistant blankets. A fire watch with extinguisher shall be present for at least 30 minutes after work completion.",
+    "applicable_permit_types": ["Hot Work"]
+  },
+  {
+    "title": "Confined Space Atmospheric Testing",
+    "content": "Prior to confined space entry, oxygen level must be between 19.5% and 23.5%, LEL must be less than 10% of LFL, and toxic gases (H2S, CO) must be below PEL limits. Continuous monitoring is required during occupancy.",
+    "applicable_permit_types": ["Confined Space Entry"]
+  },
+  {
+    "title": "Simultaneous Operations (SIMOPS) Control",
+    "content": "When multiple work permits are active in the same zone, a SIMOPS review shall be conducted to identify interaction risks. Hot work and confined space entry shall not be performed simultaneously within 30m of each other.",
+    "applicable_permit_types": ["Hot Work", "Confined Space Entry", "Height Work"]
+  },
+  {
+    "title": "Lockout-Tagout (LOTO) Verification",
+    "content": "Before maintenance work begins, all energy sources must be isolated and locked. A LOTO verification by a qualified person is required. Each worker shall apply their personal lock before work commences.",
+    "applicable_permit_types": ["Lockout-Tagout", "Electrical", "Maintenance"]
+  },
+  {
+    "title": "Emergency Evacuation Protocol",
+    "content": "Upon activation of emergency alarm, all workers shall proceed to the designated assembly point. Headcount shall be completed within 3 minutes. Rescue teams shall not enter hazardous areas without proper PPE and gas monitoring.",
+    "applicable_permit_types": []
+  }
+]

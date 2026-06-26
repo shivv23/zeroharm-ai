@@ -1,5 +1,8 @@
-const WS_URL = 'ws://localhost:8000/ws';
-const API_BASE = 'http://localhost:8000/api';
+const WS_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
+const RECONNECT_DELAY_MS = 3000;
+const COMPLIANCE_TREND_PAYLOAD_COUNT = 10;
 
 class ZeroHarmWebSocket {
   constructor() {
@@ -33,13 +36,13 @@ class ZeroHarmWebSocket {
       this.ws.onclose = () => {
         this.isConnected = false;
         this.notify('connection', { connected: false });
-        this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+        this.reconnectTimer = setTimeout(() => this.connect(), RECONNECT_DELAY_MS);
       };
       this.ws.onerror = () => {
         this.ws.close();
       };
     } catch (e) {
-      this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+      this.reconnectTimer = setTimeout(() => this.connect(), RECONNECT_DELAY_MS);
     }
   }
 

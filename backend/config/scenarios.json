@@ -1,0 +1,61 @@
+{
+  "vizag_replay": {
+    "name": "Vizag 2025 Replay",
+    "description": "Recreates the conditions that led to the Vizag Steel Plant explosion: gas pressure warnings + maintenance bypass + hot work permit in coke oven battery",
+    "changes": {
+      "Z01": {"LEL": [25, 38], "CO": [120, 200], "Temperature": [55, 75]},
+      "Z07": {"LEL": [5, 12], "Pressure": [1.8, 2.3]}
+    },
+    "permits_to_add": [
+      {"type": "Hot Work", "zone_id": "Z01", "risk_level": "Critical"},
+      {"type": "Maintenance", "zone_id": "Z01", "risk_level": "High"}
+    ],
+    "expected_alert": "COMPOUND_RISK: Hot work + gas accumulation + maintenance in Z01"
+  },
+  "confined_space_near_miss": {
+    "name": "Confined Space Near-Miss",
+    "description": "Simulates O2 depletion in a confined space entry scenario with simultaneous H2S presence",
+    "changes": {
+      "Z01": {"O2": [16.5, 18.2], "H2S": [8, 18], "LEL": [3, 8]}
+    },
+    "permits_to_add": [
+      {"type": "Confined Space Entry", "zone_id": "Z01", "risk_level": "Critical"}
+    ],
+    "expected_alert": "COMPOUND_RISK: Unsafe oxygen + toxic gas during confined space entry"
+  },
+  "gas_leak_cascade": {
+    "name": "Gas Leak Cascade",
+    "description": "Simulates a CO gas leak that spreads from Coke Oven to adjacent zones",
+    "changes": {
+      "Z01": {"CO": [250, 400], "LEL": [15, 30]},
+      "Z10": {"CO": [80, 150]},
+      "Z04": {"CO": [30, 60]}
+    },
+    "permits_to_add": [],
+    "expected_alert": "CRITICAL: CO gas leak spreading across multiple zones"
+  },
+  "fire_scenario": {
+    "name": "Fire in Gas Holder Area",
+    "description": "Simulates a fire starting in the Gas Holder Area with rapid temperature rise and pressure increase",
+    "changes": {
+      "Z07": {"Temperature": [120, 250], "Pressure": [2.5, 3.5], "LEL": [40, 70], "CO": [300, 500]},
+      "Z03": {"Temperature": [55, 80]}
+    },
+    "permits_to_add": [
+      {"type": "Hot Work", "zone_id": "Z07", "risk_level": "Critical"}
+    ],
+    "expected_alert": "FIRE + EXPLOSION risk in Gas Holder Area"
+  },
+  "maintenance_mishap": {
+    "name": "Maintenance LOTO Failure",
+    "description": "Simulates a LOTO failure where equipment is returned to service while maintenance is still in progress",
+    "changes": {
+      "Z09": {"Temperature": [30, 45], "Pressure": [0.5, 1.5]}
+    },
+    "permits_to_add": [
+      {"type": "Lockout-Tagout", "zone_id": "Z09", "risk_level": "High"},
+      {"type": "Electrical", "zone_id": "Z09", "risk_level": "Critical"}
+    ],
+    "expected_alert": "Critical equipment returned to service during active maintenance"
+  }
+}
