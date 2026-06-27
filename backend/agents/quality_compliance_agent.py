@@ -1,6 +1,5 @@
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-import random
 
 from config_loader import get_agent_settings, get_zones
 import constants as C
@@ -135,6 +134,8 @@ class QualityComplianceAuditAgent:
             findings["severity"] = "normal"
         self.last_audit_time = datetime.now()
         self.audit_history.append({"timestamp": findings["timestamp"], "score": findings["overall_compliance_score"]})
+        if len(self.audit_history) > 500:
+            self.audit_history = self.audit_history[-500:]
         self.status = "completed"
         return findings
 

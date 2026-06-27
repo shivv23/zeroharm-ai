@@ -110,4 +110,6 @@ class WhatIfSimulator:
             "id": sid, "name": name, "description": description,
             "changes": changes, "permits_to_add": [], "expected_alert": "Custom scenario applied",
         })
+        if len(self.custom_scenarios) > 50:
+            self.custom_scenarios = self.custom_scenarios[-50:]
         return sid

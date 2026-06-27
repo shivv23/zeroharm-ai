@@ -1,7 +1,5 @@
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-import json
-import os
 
 from config_loader import get_rag_documents, get_safety_practices, get_agent_settings
 import constants as C
@@ -58,6 +56,7 @@ class RAGPipeline:
                 findings["recommendations"].append("Suspend hot work immediately. Purge area and verify LEL < 10% before resuming.")
             voc = sensor_readings.get("VOC", 0)
             if voc > _rp["hot_work_voc_limit"]:
+                findings["compliant"] = False
                 findings["violations"].append(f"VOC at {voc:.1f}ppm indicates flammable atmosphere")
                 findings["recommendations"].append("Increase ventilation and re-test atmosphere before continuing hot work.")
         elif permit_type == "Confined Space Entry":

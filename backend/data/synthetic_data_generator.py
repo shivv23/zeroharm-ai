@@ -98,7 +98,7 @@ class SyntheticDataGenerator:
                 sensor_risk = 0.7
             elif s["value"] >= s["threshold"] * _sensor_cfg["risk_approaching_weight"]:
                 sensor_risk = 0.3
-        s["risk_score"] = min(1.0, sensor_risk + base_risk * _sensor_cfg["risk_noise_weight"] * noise)
+        s["risk_score"] = min(1.0, max(0.0, sensor_risk + base_risk * _sensor_cfg["risk_noise_weight"] * noise))
 
     def _get_active_permits_in_zone(self, zone_id: str) -> List[Dict]:
         return [p for p in self.active_permits if p["zone_id"] == zone_id and p["status"] == "active"]
@@ -244,7 +244,7 @@ class SyntheticDataGenerator:
                 exp = datetime.fromisoformat(p["expires_at"])
                 if datetime.now() > exp:
                     p["status"] = "completed"
-            except:
+            except (ValueError, TypeError):
                 pass
         self.active_permits = [p for p in self.active_permits if p["status"] == "active"]
         self._simulate_compound_event()

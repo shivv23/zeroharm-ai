@@ -10,14 +10,22 @@ services:
       - PORT=8000
       - WS_UPDATE_INTERVAL=2
       - RISK_TREND_MAX=60
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3000:80"
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_API_URL=http://backend:8000/api
+      - REACT_APP_WS_URL=ws://backend:8000/ws
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy

@@ -87,6 +87,8 @@ class EmergencyResponseOrchestrator:
         })
         response["status"] = "active"
         self.active_emergencies.append(response)
+        if len(self.active_emergencies) > 100:
+            self.active_emergencies = [e for e in self.active_emergencies if e.get("status") == "active"]
         return response
 
     def _generate_incident_report(self, emergency_id: str, incident_type: str, zone_id: str,

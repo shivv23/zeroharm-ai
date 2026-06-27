@@ -1,12 +1,13 @@
+import os
 from config_loader import get_agent_settings
 
 _s = get_agent_settings()
 
-# Network
-HOST = "0.0.0.0"
-PORT = 8000
-WS_UPDATE_INTERVAL = 2
-RISK_TREND_MAX = 60
+# Network (read from env vars with defaults)
+HOST = os.getenv("HOST", "0.0.0.0")
+PORT = int(os.getenv("PORT", "8000"))
+WS_UPDATE_INTERVAL = int(os.getenv("WS_UPDATE_INTERVAL", "2"))
+RISK_TREND_MAX = int(os.getenv("RISK_TREND_MAX", "60"))
 WS_URL = "/ws"
 API_PREFIX = "/api"
 
@@ -28,7 +29,7 @@ HEALTH_LABEL_EXCELLENT_STR = "Excellent"
 HEALTH_LABEL_GOOD_STR = "Good"
 HEALTH_LABEL_FAIR_STR = "Fair"
 HEALTH_LABEL_POOR_STR = "Poor"
-HIGH_RISK_PERMIT_PENALTY = 0.15
+HIGH_RISK_PERMIT_PENALTY = float(os.getenv("HIGH_RISK_PERMIT_PENALTY", "0.15"))
 
 # Sensor status strings
 SENSOR_STATUS_NORMAL = "normal"
@@ -45,7 +46,7 @@ HIGH_RISK_LEVELS = {"Critical", "High"}
 # Default values
 DEFAULT_PERMIT_TYPE = "Hot Work"
 DEFAULT_ZONE_HAZARD_CLASS = "High"
-DEFAULT_TOP_K = 3
+DEFAULT_TOP_K = int(os.getenv("RAG_DEFAULT_TOP_K", "3"))
 DEFAULT_INCIDENT_TYPE = "gas_leak"
 DEFAULT_EMERGENCY_TYPE = "medical_emergency"
 

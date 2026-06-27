@@ -6,16 +6,18 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.routing import APIRoute
 import uvicorn
 
 import constants as C
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+load_dotenv()
 
 from data.synthetic_data_generator import SyntheticDataGenerator
 from agents.compound_risk_engine import CompoundRiskDetectionEngine
@@ -84,7 +86,7 @@ class ZeroHarmAPI:
                     self.plant_state = self.generator.apply_scenario_overrides(self.plant_state, self.scenario_state)
                 else:
                     self.plant_state = self.generator.step()
-                risk_result = await self.risk_engine.run_async(self.plant_state)
+                risk_result = await self.risk_engine.run_async(copy.deepcopy(self.plant_state))
                 self.risk_trend.append({
                     "timestamp": datetime.now().isoformat(),
                     "score": risk_result.get("risk_score", 0),
@@ -110,7 +112,7 @@ class ZeroHarmAPI:
                         self.activity_feed.log_compound_risk(cr.get("zone_name", ""), 1, cr.get("recommendation", ""))
                 step_count += 1
                 if step_count % C.COMPLIANCE_AUDIT_INTERVAL == 0:
-                    compliance_result = await asyncio.to_thread(self.compliance_agent.run_audit, self.plant_state)
+                    compliance_result = await asyncio.to_thread(self.compliance_agent.run_audit, copy.deepcopy(self.plant_state))
                     v_count = len(compliance_result.get("violations", []))
                     c_count = len(compliance_result.get("critical_findings", []))
                     self.activity_feed.log_compliance_audit(compliance_result[C.OVERALL_COMPLIANCE_SCORE_KEY], v_count, c_count)
@@ -156,6 +158,12 @@ async def lifespan(app: FastAPI):
     yield
     api.simulation_running = False
     loop_task.cancel()
+    for ws in api.active_connections:
+        try:
+            await ws.close(code=1001, reason="Server shutting down")
+        except Exception:
+            pass
+    api.active_connections.clear()
     logger.info("ZeroHarm AI Platform shutting down...")
 
 
@@ -269,8 +277,8 @@ async def get_active_emergencies():
 
 
 @app.post("/api/emergency/resolve/{emergency_id}")
-async def resolve_emergency(emergency_id: str, data: Dict = {}):
-    notes = data.get("notes", "")
+async def resolve_emergency(emergency_id: str, data: Optional[Dict] = None):
+    notes = data.get("notes", "") if data else ""
     result = api.emergency_response.resolve(emergency_id, notes)
     if not result:
         raise HTTPException(status_code=404, detail=f"Emergency {emergency_id} not found")
@@ -493,7 +501,7 @@ async def websocket_endpoint(websocket: WebSocket):
             except json.JSONDecodeError:
                 await websocket.send_json({"type": "error", "message": "Invalid JSON"})
     except WebSocketDisconnect:
-        api.active_connections.remove(websocket)
+        api.active_connections[:] = [c for c in api.active_connections if c is not websocket]
         logger.info(f"Client disconnected. Total: {len(api.active_connections)}")
 
 

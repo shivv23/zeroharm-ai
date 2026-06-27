@@ -1,7 +1,5 @@
-from typing import Dict, List, Optional, Any, TypedDict, Annotated
+from typing import Dict, List, Optional, Any, TypedDict
 from datetime import datetime
-import json
-import operator
 import asyncio
 
 from .sensor_monitor_agent import SensorMonitorAgent
@@ -147,4 +145,8 @@ class CompoundRiskDetectionEngine:
         }
 
     def run(self, plant_state: Dict) -> Dict:
-        return asyncio.run(self.run_async(plant_state))
+        try:
+            loop = asyncio.get_running_loop()
+            return loop.run_until_complete(self.run_async(plant_state))
+        except RuntimeError:
+            return asyncio.run(self.run_async(plant_state))

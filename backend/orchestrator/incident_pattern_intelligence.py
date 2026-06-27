@@ -1,8 +1,5 @@
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
-import random
-import hashlib
-import json
 
 from config_loader import get_incident_records, get_zones, get_agent_settings
 import constants as C
