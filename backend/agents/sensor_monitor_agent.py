@@ -41,11 +41,11 @@ class SensorMonitorAgent:
                 findings["warning_sensors"].append(zone_entry)
         for zid, zdata in zone_sensors.items():
             if zdata["critical"] > 0:
-                severity = "CRITICAL"
+                severity = C.SEVERITY_CRITICAL
             elif zdata["warning"] > 0:
-                severity = "WARNING"
+                severity = C.SENSOR_STATUS_WARNING
             else:
-                severity = "NORMAL"
+                severity = C.SENSOR_STATUS_NORMAL
             findings["zone_alerts"][zid] = {
                 "severity": severity, "total_sensors": zdata["total"],
                 "critical_count": zdata["critical"], "warning_count": zdata["warning"],
@@ -55,12 +55,12 @@ class SensorMonitorAgent:
         total_warning = len(findings["warning_sensors"])
         if total_critical > 0:
             findings["summary"] = f"CRITICAL: {total_critical} sensors in critical state, {total_warning} in warning"
-            findings["severity"] = "critical"
+            findings["severity"] = C.SEVERITY_CRITICAL
         elif total_warning > 0:
             findings["summary"] = f"WARNING: {total_warning} sensors in warning state"
-            findings["severity"] = "warning"
+            findings["severity"] = C.SENSOR_STATUS_WARNING
         else:
             findings["summary"] = "NORMAL: No sensor anomalies detected"
-            findings["severity"] = "normal"
+            findings["severity"] = C.SENSOR_STATUS_NORMAL
         self.status = "completed"
         return findings

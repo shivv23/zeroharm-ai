@@ -38,10 +38,20 @@ SENSOR_STATUS_CRITICAL = "critical"
 UNKNOWN_ZONE = "unknown"
 UNKNOWN_LABEL = "Unknown"
 
-# Severity values
+# Severity values — runtime severity strings (all lowercase)
+SEVERITY_NORMAL = "normal"
+SEVERITY_WARNING = "warning"
+SEVERITY_CRITICAL = "critical"
+SEVERITY_HIGH = "high"
+SEVERITY_MEDIUM = "medium"
+SEVERITY_LOW = "low"
+SEVERITY_INFO = "info"
+SEVERITY_PASSED = "passed"
+
+# Severity mapping for internal risk level weights (different from runtime display)
 SEVERITY_ORDER = {"catastrophic": 5, "critical": 4, "major": 3, "moderate": 2, "near_miss": 1}
 SEVERITY_LABELS = {5: "CRITICAL", 4: "HIGH", 3: "MEDIUM", 2: "LOW", 1: "INFO"}
-HIGH_RISK_LEVELS = {"Critical", "High"}
+HIGH_RISK_LEVELS = {"critical", "high"}
 
 # Default values
 DEFAULT_PERMIT_TYPE = "Hot Work"

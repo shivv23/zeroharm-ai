@@ -101,7 +101,7 @@ class QualityComplianceAuditAgent:
             cat_score = self._audit_category(cat_id, category, active_permits, sensors, zone_risks)
             findings["category_scores"][cat_id] = cat_score
             for check in cat_score["checks"]:
-                if not check["passed"] and check["severity"] == "critical":
+                if not check["passed"] and check["severity"] == C.SEVERITY_CRITICAL:
                     findings["critical_findings"].append({
                         "category": category["title"], "check": check["description"],
                         "standard": category["standard"], "detail": check.get("detail", ""),
@@ -125,13 +125,13 @@ class QualityComplianceAuditAgent:
         violation_count = len(findings["violations"])
         if critical_count > 0:
             findings["summary"] = f"CRITICAL: {critical_count} critical compliance gaps found. Overall score: {findings['overall_compliance_score']}%"
-            findings["severity"] = "critical"
+            findings["severity"] = C.SEVERITY_CRITICAL
         elif violation_count > _compliance_cfg["warning_violation_threshold"]:
             findings["summary"] = f"WARNING: {violation_count} compliance gaps found. Overall score: {findings['overall_compliance_score']}%"
-            findings["severity"] = "warning"
+            findings["severity"] = C.SENSOR_STATUS_WARNING
         else:
             findings["summary"] = f"PASS: Overall compliance score {findings['overall_compliance_score']}% with {violation_count} minor observations"
-            findings["severity"] = "normal"
+            findings["severity"] = C.SENSOR_STATUS_NORMAL
         self.last_audit_time = datetime.now()
         self.audit_history.append({"timestamp": findings["timestamp"], "score": findings["overall_compliance_score"]})
         if len(self.audit_history) > 500:
@@ -159,31 +159,31 @@ class QualityComplianceAuditAgent:
         check_id = check["id"]
         passed = True
         detail = ""
-        severity = "info"
+        severity = C.SEVERITY_INFO
 
         if check_id == "GD-01":
             bypass_count = sum(1 for s in sensors.values() if s.get("status") == C.SENSOR_STATUS_CRITICAL)
             passed = bypass_count < _compliance_cfg["critical_sensor_bypass_limit"]
             detail = f"{bypass_count} sensors in critical state"
-            severity = "critical" if bypass_count > _compliance_cfg["gd02_critical_threshold"] else "warning" if bypass_count > 2 else "info"
+            severity = C.SEVERITY_CRITICAL if bypass_count > _compliance_cfg["gd02_critical_threshold"] else C.SENSOR_STATUS_WARNING if bypass_count > 2 else C.SEVERITY_INFO
 
         elif check_id == "GD-02":
             bypassed = [s for s in sensors.values() if s.get("status") in [C.SENSOR_STATUS_WARNING, C.SENSOR_STATUS_CRITICAL]]
             passed = len(bypassed) < _compliance_cfg["warning_sensor_limit"]
             detail = f"{len(bypassed)} sensors in warning/critical"
-            severity = "critical" if len(bypassed) > _compliance_cfg["gd02_critical_threshold"] else "warning"
+            severity = C.SEVERITY_CRITICAL if len(bypassed) > _compliance_cfg["gd02_critical_threshold"] else C.SENSOR_STATUS_WARNING
 
         elif check_id == "GD-05":
             extreme_zones = [z for z in _extreme_zones if zone_risks.get(z, 0) > _compliance_cfg["extreme_risk_zone_threshold"]]
             passed = len(extreme_zones) == 0
             detail = f"{len(extreme_zones)} extreme-risk zones with inadequate coverage"
-            severity = "critical" if len(extreme_zones) > 1 else "warning"
+            severity = C.SEVERITY_CRITICAL if len(extreme_zones) > 1 else C.SENSOR_STATUS_WARNING
 
         elif check_id == "PTW-01":
             critical_permits = [p for p in permits if p.get("risk_level") == "Critical"]
             passed = len(critical_permits) <= _compliance_cfg["ptw01_critical_permit_limit"]
             detail = f"{len(critical_permits)} critical permits active"
-            severity = "critical" if len(critical_permits) > _compliance_cfg["ptw01_severity_limit"] else "warning"
+            severity = C.SEVERITY_CRITICAL if len(critical_permits) > _compliance_cfg["ptw01_severity_limit"] else C.SENSOR_STATUS_WARNING
 
         elif check_id == "PTW-04":
             zones_with_overlap = {}
@@ -193,7 +193,7 @@ class QualityComplianceAuditAgent:
             overlaps = {z: ps for z, ps in zones_with_overlap.items() if len(ps) > 1}
             passed = len(overlaps) <= _compliance_cfg["ptw04_overlap_limit"]
             detail = f"{len(overlaps)} zones with overlapping permits"
-            severity = "critical" if len(overlaps) > _compliance_cfg["ptw04_overlap_critical_limit"] else "warning"
+            severity = C.SEVERITY_CRITICAL if len(overlaps) > _compliance_cfg["ptw04_overlap_critical_limit"] else C.SENSOR_STATUS_WARNING
 
         elif check_id == "MS-01":
             passed = any(p.get("type") == "Lockout-Tagout" for p in permits)
@@ -203,7 +203,7 @@ class QualityComplianceAuditAgent:
             high_risk_count = sum(1 for v in zone_risks.values() if v > _compliance_cfg["ep01_high_risk_threshold"])
             passed = high_risk_count <= _compliance_cfg["ep01_max_high_risk_zones"]
             detail = f"{high_risk_count} high-risk zones need evacuation plan review"
-            severity = "critical" if high_risk_count > 5 else "warning"
+            severity = C.SEVERITY_CRITICAL if high_risk_count > 5 else C.SENSOR_STATUS_WARNING
 
         elif check_id == "EP-05":
             passed = True
@@ -212,12 +212,12 @@ class QualityComplianceAuditAgent:
                     if zone_risks.get(p["zone_id"], 0) >= _compliance_cfg["ep05_fire_suppression_risk_limit"]:
                         passed = False
                         detail = f"Fire suppression may be inadequate for hot work in {p.get('zone_name', '')}"
-                        severity = "critical"
+                        severity = C.SEVERITY_CRITICAL
 
         return {
             "id": check_id, "description": check["description"],
             "passed": passed, "detail": detail,
-            "severity": severity if not passed else "passed",
+            "severity": severity if not passed else C.SEVERITY_PASSED,
         }
 
     def get_compliance_trend(self) -> List[Dict]:

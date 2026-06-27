@@ -4,7 +4,7 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
@@ -14,6 +14,10 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 import constants as C
+from api.schemas import (
+    PermitComplianceRequest, RAGSearchRequest, EmergencyTriggerRequest,
+    EmergencyResolveRequest, WhatIfApplyRequest, WhatIfCustomRequest,
+)
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -239,26 +243,26 @@ async def get_regulatory_context(hazard_type: str):
 
 
 @app.post("/api/rag/permit-compliance")
-async def check_permit_compliance(data: Dict):
-    permit_type = data.get("permit_type", C.DEFAULT_PERMIT_TYPE)
-    zone_hazard = data.get("zone_hazard_class", C.DEFAULT_ZONE_HAZARD_CLASS)
-    sensors = data.get("sensor_readings", {})
+async def check_permit_compliance(data: PermitComplianceRequest):
+    permit_type = data.permit_type
+    zone_hazard = data.zone_hazard_class
+    sensors = data.sensor_readings
     result = api.rag_pipeline.query_permit_compliance(permit_type, zone_hazard, sensors)
     return flagged_response(result)
 
 
 @app.post("/api/rag/search")
-async def search_documents(data: Dict):
-    query = data.get("query", "")
-    top_k = data.get("top_k", C.DEFAULT_TOP_K)
+async def search_documents(data: RAGSearchRequest):
+    query = data.query
+    top_k = data.top_k
     results = api.rag_pipeline.search(query, top_k)
     return flagged_response({"query": query, "results": results})
 
 
 @app.post("/api/emergency/trigger")
-async def trigger_emergency(data: Dict):
-    incident_type = data.get("type", C.DEFAULT_INCIDENT_TYPE)
-    context = data.get("context", {})
+async def trigger_emergency(data: EmergencyTriggerRequest):
+    incident_type = data.type
+    context = data.context
     if not api.plant_state:
         api.plant_state = api.generator.step()
     context.setdefault("sensor_snapshot",
@@ -277,8 +281,8 @@ async def get_active_emergencies():
 
 
 @app.post("/api/emergency/resolve/{emergency_id}")
-async def resolve_emergency(emergency_id: str, data: Optional[Dict] = None):
-    notes = data.get("notes", "") if data else ""
+async def resolve_emergency(emergency_id: str, data: EmergencyResolveRequest = None):
+    notes = data.notes if data else ""
     result = api.emergency_response.resolve(emergency_id, notes)
     if not result:
         raise HTTPException(status_code=404, detail=f"Emergency {emergency_id} not found")
@@ -402,8 +406,8 @@ async def list_what_if_scenarios():
 
 
 @app.post("/api/what-if/apply")
-async def apply_what_if_scenario(data: Dict):
-    scenario_id = data.get("scenario_id", "")
+async def apply_what_if_scenario(data: WhatIfApplyRequest):
+    scenario_id = data.scenario_id
     if not api.plant_state:
         api.plant_state = api.generator.step()
     modified = api.what_if.apply_scenario(scenario_id, api.plant_state)
@@ -419,12 +423,12 @@ async def apply_what_if_scenario(data: Dict):
 
 
 @app.post("/api/what-if/custom")
-async def apply_custom_scenario(data: Dict):
+async def apply_custom_scenario(data: WhatIfCustomRequest):
     if not api.plant_state:
         api.plant_state = api.generator.step()
-    changes = data.get("changes", {})
-    permits = data.get("permits_to_add", [])
-    scenario_name = data.get("name", "Custom Scenario")
+    changes = data.changes
+    permits = data.permits_to_add
+    scenario_name = data.name
     modified = api.what_if.apply_custom(api.plant_state, changes, permits, scenario_name)
     api.scenario_active = True
     api.scenario_state = copy.deepcopy(modified)

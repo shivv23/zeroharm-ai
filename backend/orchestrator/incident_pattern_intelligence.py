@@ -30,7 +30,7 @@ class IncidentPatternIntelligence:
         for zone, incidents in zone_incidents.items():
             if len(incidents) >= 2:
                 max_severity = max(_ips["severity_order"].get(i["severity"], 0) for i in incidents)
-                severity_label = _ips["severity_labels"].get(str(max_severity), "INFO")
+                severity_label = _ips["severity_labels"].get(str(max_severity), C.SEVERITY_INFO)
                 patterns.append({
                     "type": "RECURRING_ZONE", "zone": zone,
                     "incident_count": len(incidents), "incidents": [i["id"] for i in incidents],
@@ -45,7 +45,7 @@ class IncidentPatternIntelligence:
                     "type": "RECURRING_CAUSE", "cause": cause,
                     "incident_count": len(incidents), "incidents": [i["id"] for i in incidents],
                     "description": f"'{cause}' contributed to {len(incidents)} incidents",
-                    "severity": "HIGH",
+                    "severity": C.SEVERITY_HIGH,
                     "recommendation": f"Address root cause: {cause}. Develop targeted preventive action plan.",
                 })
 
@@ -56,7 +56,7 @@ class IncidentPatternIntelligence:
                     "type": "TYPE_ZONE_PATTERN", "zone": zone, "incident_type": inc_type,
                     "incident_count": len(incidents),
                     "description": f"{inc_type.replace('_', ' ').title()} has occurred {len(incidents)} times in {zone}",
-                    "severity": "MEDIUM",
+                    "severity": C.SEVERITY_MEDIUM,
                     "recommendation": f"Review {inc_type.replace('_', ' ')} controls for {zone}. Consider additional engineering controls.",
                 })
 

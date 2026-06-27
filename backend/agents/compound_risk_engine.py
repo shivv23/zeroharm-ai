@@ -57,13 +57,13 @@ class CompoundRiskDetectionEngine:
         alerts = []
         for cs in sensor.get("critical_sensors", []):
             alerts.append({
-                "type": "SENSOR_CRITICAL", "severity": "critical", "source": "sensor_monitor",
+                "type": "SENSOR_CRITICAL", "severity": C.SEVERITY_CRITICAL, "source": "sensor_monitor",
                 "message": f"{cs['type']} sensor at {cs['value']:.1f}{cs['unit']} in {cs.get('zone_id', C.UNKNOWN_ZONE)}",
                 "timestamp": datetime.now().isoformat(),
             })
         for hrp in permit.get("high_risk_permits", []):
             alerts.append({
-                "type": "HIGH_RISK_PERMIT", "severity": "high", "source": "permit_activity",
+                "type": "HIGH_RISK_PERMIT", "severity": C.SEVERITY_HIGH, "source": "permit_activity",
                 "message": f"{hrp['type']} ({hrp['risk_level']}) in {hrp['zone_name']}",
                 "timestamp": datetime.now().isoformat(),
             })
@@ -71,20 +71,20 @@ class CompoundRiskDetectionEngine:
             if len(ov.get("permit_types", [])) > _cr["overlap_min_types"]:
                 types_str = ", ".join(ov["permit_types"])
                 alerts.append({
-                    "type": "PERMIT_OVERLAP", "severity": "high", "source": "permit_activity",
+                    "type": "PERMIT_OVERLAP", "severity": C.SEVERITY_HIGH, "source": "permit_activity",
                     "message": f"Multiple permits ({types_str}) overlapping in {ov['zone_name']} ({ov['zone_id']})",
                     "timestamp": datetime.now().isoformat(),
                 })
         for mp in maintenance.get("maintenance_equipment_with_permits", []):
             eq = mp.get("equipment", {})
             alerts.append({
-                "type": "MAINTENANCE_PERMIT_CONFLICT", "severity": "high", "source": "maintenance_status",
+                "type": "MAINTENANCE_PERMIT_CONFLICT", "severity": C.SEVERITY_HIGH, "source": "maintenance_status",
                 "message": f"Equipment {eq.get('name', '')} in maintenance with active permits in zone {mp.get('zone_id', '')}",
                 "timestamp": datetime.now().isoformat(),
             })
         for ecr in existing_compound:
             alerts.append({
-                "type": "COMPOUND_RISK", "severity": "critical", "source": "compound_risk_engine",
+                "type": "COMPOUND_RISK", "severity": C.SEVERITY_CRITICAL, "source": "compound_risk_engine",
                 "message": ecr.get("recommendation", f"Compound risk in {ecr['zone_name']}"),
                 "zone_id": ecr["zone_id"], "zone_name": ecr["zone_name"],
                 "compound_risk_score": ecr.get("compound_risk_score", 0),
@@ -95,24 +95,24 @@ class CompoundRiskDetectionEngine:
         compound_risk_alerts = [a for a in alerts if a["type"] == "COMPOUND_RISK"]
         if compound_risk_alerts:
             fused_score = max(fused_score, _cr["compound_risk_min_score"])
-            fused_severity = "critical"
+            fused_severity = C.SEVERITY_CRITICAL
         elif sensor_severity >= _cr["critical_sensor_severity"] or fused_score >= _cr["critical_fused_threshold"]:
-            fused_severity = "critical"
+            fused_severity = C.SEVERITY_CRITICAL
         elif fused_score >= _cr["high_fused_threshold"]:
-            fused_severity = "high"
+            fused_severity = C.SEVERITY_HIGH
         elif fused_score >= _cr["warning_fused_threshold"]:
-            fused_severity = "warning"
+            fused_severity = C.SENSOR_STATUS_WARNING
         elif fused_score >= _cr["info_fused_threshold"]:
-            fused_severity = "info"
+            fused_severity = C.SEVERITY_INFO
         else:
             fused_severity = C.SENSOR_STATUS_NORMAL
 
         summary_parts = []
-        if sensor.get("severity") in [C.SENSOR_STATUS_WARNING, "critical"]:
+        if sensor.get("severity") in [C.SENSOR_STATUS_WARNING, C.SEVERITY_CRITICAL]:
             summary_parts.append(f"Sensors: {sensor.get('summary', '')}")
-        if permit.get("severity") in [C.SENSOR_STATUS_WARNING, "high", "critical"]:
+        if permit.get("severity") in [C.SENSOR_STATUS_WARNING, C.SEVERITY_HIGH, C.SEVERITY_CRITICAL]:
             summary_parts.append(f"Permits: {permit.get('summary', '')}")
-        if maintenance.get("severity") in ["high", "critical"]:
+        if maintenance.get("severity") in [C.SEVERITY_HIGH, C.SEVERITY_CRITICAL]:
             summary_parts.append(f"Maintenance: {maintenance.get('summary', '')}")
         if compound_risk_alerts:
             summary_parts.append(f"COMPOUND RISK: {len(compound_risk_alerts)} compound risk conditions detected")

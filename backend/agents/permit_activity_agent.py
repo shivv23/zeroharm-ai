@@ -21,11 +21,11 @@ class PermitActivityAgent:
             "timestamp": datetime.now().isoformat(),
             "total_active_permits": len(permits), "permits_by_type": {}, "permits_by_zone": {},
             "permits_by_risk": {}, "high_risk_permits": [],
-            "overlapping_zone_permits": [], "summary": "", "severity": "normal",
+            "overlapping_zone_permits": [], "summary": "", "severity": C.SENSOR_STATUS_NORMAL,
         }
         if not permits:
             findings["summary"] = "NORMAL: No active permits"
-            findings["severity"] = "normal"
+            findings["severity"] = C.SENSOR_STATUS_NORMAL
             self.status = "completed"
             return findings
         for p in permits:
@@ -53,12 +53,12 @@ class PermitActivityAgent:
         high_risk_count = len(findings["high_risk_permits"])
         overlap_count = len(findings["overlapping_zone_permits"])
         if high_risk_count > 0:
-            findings["severity"] = "warning"
+            findings["severity"] = C.SENSOR_STATUS_WARNING
             findings["summary"] = f"WARNING: {high_risk_count} high/critical risk permits active across {len(findings['permits_by_zone'])} zones"
         if overlap_count > 0:
-            findings["severity"] = "high"
+            findings["severity"] = C.SEVERITY_HIGH
             findings["summary"] = f"ALERT: {overlap_count} zones with overlapping permits ({high_risk_count} high-risk)"
         if findings["permits_by_risk"].get("Critical", 0) > 0:
-            findings["severity"] = "critical"
+            findings["severity"] = C.SEVERITY_CRITICAL
         self.status = "completed"
         return findings

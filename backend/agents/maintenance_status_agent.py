@@ -46,7 +46,7 @@ class MaintenanceStatusAgent:
             "timestamp": datetime.now().isoformat(),
             "equipment_in_maintenance": [], "equipment_bypassed": [],
             "maintenance_equipment_with_permits": [], "zone_maintenance_map": {},
-            "summary": "", "severity": "normal",
+            "summary": "", "severity": C.SENSOR_STATUS_NORMAL,
         }
         for eq_id, eq in self.equipment_status.items():
             zone_id = eq["zone_id"]
@@ -64,11 +64,11 @@ class MaintenanceStatusAgent:
                         "zone_id": zone_id,
                     })
         if findings["maintenance_equipment_with_permits"]:
-            findings["severity"] = "high"
+            findings["severity"] = C.SEVERITY_HIGH
             count = len(findings["maintenance_equipment_with_permits"])
             findings["summary"] = f"ALERT: {count} equipment in maintenance/bypass with active work permits in same zone"
         elif findings["equipment_in_maintenance"]:
-            findings["severity"] = "info"
+            findings["severity"] = C.SEVERITY_INFO
             findings["summary"] = f"INFO: {len(findings['equipment_in_maintenance'])} equipment in maintenance"
         else:
             findings["summary"] = "NORMAL: No maintenance conflicts detected"
