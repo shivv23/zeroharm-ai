@@ -1,5 +1,8 @@
 import networkx as nx
-from typing import Dict, List, Optional, Any
+from typing import Dict, List
+
+import json
+import os
 
 from config_loader import get_regulatory_standards, get_agent_settings
 
@@ -9,34 +12,26 @@ class IndustrialKnowledgeGraph:
         self.graph = nx.DiGraph()
         self.oisd_standards = get_regulatory_standards()
         _kg = get_agent_settings().get("knowledge_graph", {}).get("risk_patterns", {})
-        self._risk_patterns = {
-            ("Confined Space Entry", "O2"): {
-                "risk": "Oxygen deficiency during confined space entry",
-                "regulation": "Factory-Act-1948-Sec36",
-                "critical_threshold": _kg.get("confined_space_o2_threshold", 19.0)
-            },
-            ("Hot Work", "LEL"): {
-                "risk": "Flammable atmosphere during hot work",
-                "regulation": "Factory-Act-1948-Sec37",
-                "critical_threshold": _kg.get("hot_work_lel_threshold", 10.0)
-            },
-            ("Confined Space Entry", "H2S"): {
-                "risk": "Toxic gas during confined space entry",
-                "regulation": "Factory-Act-1948-Sec36",
-                "critical_threshold": _kg.get("confined_space_h2s_threshold", 5.0)
-            },
-            ("Confined Space Entry", "LEL"): {
-                "risk": "Flammable atmosphere during confined space entry",
-                "regulation": "Factory-Act-1948-Sec37",
-                "critical_threshold": _kg.get("confined_space_lel_threshold", 10.0)
-            },
-            ("Hot Work", "CO"): {
-                "risk": "Carbon monoxide during hot work",
-                "regulation": "Factory-Act-1948-Sec37",
-                "critical_threshold": _kg.get("hot_work_co_threshold", 50.0)
-            },
-        }
-        self._build_schema()
+        self._risk_patterns = self._load_risk_patterns(_kg)
+
+    def _load_risk_patterns(self, _kg):
+        config_path = os.path.join(os.path.dirname(__file__), "..", "config", "kg_risk_patterns.json")
+        patterns = {}
+        try:
+            with open(config_path) as f:
+                data = json.load(f)
+            for p in data.get("patterns", []):
+                key = (p["permit_type"], p["sensor_type"])
+                threshold = _kg.get(p["threshold_key"], p["default_threshold"])
+                patterns[key] = {
+                    "risk": p["risk"],
+                    "regulation": p["regulation"],
+                    "critical_threshold": threshold,
+                    "invert": p.get("invert_comparison", False),
+                }
+        except Exception:
+            pass
+        return patterns
 
     def _build_schema(self):
         self.graph.add_node("schema", type="meta", description="Industrial Safety Knowledge Graph")
@@ -83,8 +78,8 @@ class IndustrialKnowledgeGraph:
             for (risk_ptype, sensor_type), info in self._risk_patterns.items():
                 if ptype == risk_ptype and sensor_type in sensor_readings:
                     value = sensor_readings[sensor_type]
-                    is_o2 = sensor_type == "O2"
-                    if (value > info["critical_threshold"] if not is_o2 else value < info["critical_threshold"]):
+                    invert = info.get("invert", False)
+                    if (value < info["critical_threshold"] if invert else value > info["critical_threshold"]):
                         severity = min(1.0, abs(value - info["critical_threshold"]) / info["critical_threshold"])
                         findings.append({
                             "zone_id": zone_id, "permit_type": ptype, "sensor_type": sensor_type,

@@ -6,7 +6,9 @@ __pycache__/
 .env
 venv/
 .venv/
+# Runtime logs
 *.log
+!node_modules/**/*.log
 .DS_Store
 *.egg-info/
 dist/

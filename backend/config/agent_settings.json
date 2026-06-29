@@ -112,5 +112,11 @@
     "top_causes_limit": 5,
     "max_prevention_recs": 5,
     "pattern_sort_order": {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+  },
+  "report_generation": {
+    "max_violations_in_report": 50,
+    "include_recommendations": true,
+    "company_name": "Visakhapatnam Steel Plant",
+    "confidentiality_label": "CONFIDENTIAL - FOR REGULATORY SUBMISSION"
   }
 }

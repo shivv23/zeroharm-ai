@@ -4,14 +4,12 @@ services:
     env: python
     region: ohio
     plan: starter
-    buildCommand: pip install -r requirements.txt
+    buildCommand: cd backend && pip install -r requirements.txt
     startCommand: cd backend && uvicorn api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
       - key: HOST
         value: 0.0.0.0
-      - key: PORT
-        value: 8000
       - key: WS_UPDATE_INTERVAL
         value: 2
       - key: RISK_TREND_MAX
@@ -19,12 +17,10 @@ services:
 
 static_sites:
   - name: zero-harmer-frontend
-    buildCommand: cd frontend && npm install && npm run build
+    buildCommand: cd frontend && REACT_APP_WS_URL=$REACT_APP_WS_URL REACT_APP_API_URL=$REACT_APP_API_URL npm install && npm run build
     staticPublishPath: frontend/build
     envVars:
       - key: REACT_APP_WS_URL
         value: wss://zero-harmer-backend.onrender.com/ws
       - key: REACT_APP_API_URL
         value: https://zero-harmer-backend.onrender.com/api
-      - key: REACT_APP_NAME
-        value: zero-harmer

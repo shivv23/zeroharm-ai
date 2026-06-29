@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Any
+from typing import Dict
 from datetime import datetime
 
 from config_loader import get_agent_settings

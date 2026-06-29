@@ -10,22 +10,44 @@ services:
       - PORT=8000
       - WS_UPDATE_INTERVAL=2
       - RISK_TREND_MAX=60
+      - HIGH_RISK_PERMIT_PENALTY=0.15
+      - RAG_DEFAULT_TOP_K=3
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
-      interval: 15s
-      timeout: 5s
+      test: wget --no-verbose --tries=1 --spider http://localhost:8000/api/health || exit 1
+      interval: 30s
+      timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 30s
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    stop_grace_period: 30s
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - REACT_APP_WS_URL=ws://backend:8000/ws
+        - REACT_APP_API_URL=http://backend:8000/api
     ports:
-      - "3000:80"
-    environment:
-      - REACT_APP_API_URL=http://backend:8000/api
-      - REACT_APP_WS_URL=ws://backend:8000/ws
+      - "8080:80"
     depends_on:
       backend:
         condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    stop_grace_period: 10s

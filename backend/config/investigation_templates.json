@@ -1,0 +1,14 @@
+{
+  "5_why_template": {
+    "incident_description": "",
+    "why_1": {"question": "Why did this incident occur?", "answer": ""},
+    "why_2": {"question": "Why did that happen?", "answer": ""},
+    "why_3": {"question": "What underlying condition allowed this?", "answer": ""},
+    "why_4": {"question": "Why was that condition present?", "answer": ""},
+    "why_5": {"question": "What is the systemic root cause?", "answer": ""},
+    "root_cause": "",
+    "corrective_actions": []
+  },
+  "fishbone_categories": ["People", "Process", "Equipment", "Environment", "Management", "Measurement"],
+  "report_sections": ["executive_summary", "incident_details", "root_cause_analysis", "capa_plan", "timeline", "conclusion"]
+}

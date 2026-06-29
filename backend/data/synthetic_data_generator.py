@@ -1,11 +1,22 @@
 import numpy as np
 import uuid
 import random
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
-from config_loader import get_zones, get_sensor_defaults, get_worker_names, get_plant_name, get_agent_settings, get_sensor_types, get_equipment_types
+from config_loader import get_zones, get_sensor_defaults, get_worker_names, get_plant_name, get_agent_settings, get_sensor_types
 import constants as C
+
+logger = logging.getLogger("zeroharm-synthetic")
+
+
+def _to_native(v):
+    if isinstance(v, (np.floating,)):
+        return float(v)
+    if isinstance(v, (np.integer,)):
+        return int(v)
+    return v
 
 _zones = get_zones()
 _sensor_cfg = get_sensor_defaults()
@@ -245,7 +256,7 @@ class SyntheticDataGenerator:
                 if datetime.now() > exp:
                     p["status"] = "completed"
             except (ValueError, TypeError):
-                pass
+                logger.warning(f"Invalid expiry date for permit {p.get('id', 'unknown')}: {p.get('expires_at', 'missing')}")
         self.active_permits = [p for p in self.active_permits if p["status"] == "active"]
         self._simulate_compound_event()
         compound_risks = self._check_compound_conditions()
@@ -254,7 +265,7 @@ class SyntheticDataGenerator:
         return {
             "timestamp": datetime.now().isoformat(),
             "time_step": self.time_step,
-            "sensors": {sid: {k: v for k, v in s.items() if k in sensor_keys} for sid, s in self.sensors.items()},
+            "sensors": {sid: {k: _to_native(v) for k, v in s.items() if k in sensor_keys} for sid, s in self.sensors.items()},
             "active_permits": self.active_permits,
             "compound_risks": compound_risks,
             "zone_risk_scores": zone_risk_scores,
@@ -311,4 +322,5 @@ if __name__ == "__main__":
     gen = SyntheticDataGenerator()
     for _ in range(50):
         state = gen.step()
-        print(f"Step {state['time_step']}: Compound risks: {len(state['compound_risks']) if state['compound_risks'] else 0}")
+        if state.get("compound_risks"):
+            logger.info(f"Step {state['time_step']}: Compound risks: {len(state['compound_risks'])}")

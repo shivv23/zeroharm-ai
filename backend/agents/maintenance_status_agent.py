@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Any
+from typing import Dict
 from datetime import datetime
 import random
 
@@ -21,7 +21,7 @@ class MaintenanceStatusAgent:
         zones = _sd["maintenance_zones"]
         eq_types = _sd["equipment_types"]
         for z in zones:
-            for i in range(_sd["equipment_per_zone_min"], _sd["equipment_per_zone_max"]):
+            for i in range(_sd["equipment_per_zone_min"], _sd["equipment_per_zone_max"] + 1):
                 eq_id = f"EQ-{z}-{i:03d}"
                 eq_type = random.choice(eq_types)
                 self.equipment_status[eq_id] = {

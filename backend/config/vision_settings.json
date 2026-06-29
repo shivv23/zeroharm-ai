@@ -1,0 +1,14 @@
+{
+  "enabled": false,
+  "model_path": "yolov8n.pt",
+  "confidence_threshold": 0.5,
+  "rtsp_urls": [],
+  "check_interval": 5,
+  "zones": {
+    "Z01": {"restricted": true, "ppe_required": ["helmet", "vest"]},
+    "Z02": {"restricted": true, "ppe_required": ["helmet", "vest", "gloves"]},
+    "Z07": {"restricted": true, "ppe_required": ["helmet", "vest", "gloves", "face_shield"]}
+  },
+  "alert_on_violation": true,
+  "alert_severity": "high"
+}

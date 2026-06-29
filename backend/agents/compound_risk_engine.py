@@ -1,6 +1,7 @@
-from typing import Dict, List, Optional, Any, TypedDict
+from typing import Dict, List, Optional, TypedDict
 from datetime import datetime
 import asyncio
+import copy
 
 from .sensor_monitor_agent import SensorMonitorAgent
 from .permit_activity_agent import PermitActivityAgent
@@ -125,16 +126,16 @@ class CompoundRiskDetectionEngine:
         return state
 
     async def run_async(self, plant_state: Dict) -> Dict:
+        sensor_findings = await asyncio.to_thread(self.sensor_agent.analyze, copy.deepcopy(plant_state))
+        permit_findings = await asyncio.to_thread(self.permit_agent.analyze, copy.deepcopy(plant_state))
+        maint_findings = await asyncio.to_thread(self.maintenance_agent.analyze, copy.deepcopy(plant_state))
         state: AgentState = {
             "plant_state": plant_state,
-            "sensor_findings": None, "permit_findings": None, "maintenance_findings": None,
+            "sensor_findings": sensor_findings, "permit_findings": permit_findings,
+            "maintenance_findings": maint_findings,
             "compound_risks": None, "fused_risk_score": None, "fused_severity": None,
             "fused_alerts": None, "fused_summary": None,
         }
-        sensor_task = asyncio.create_task(asyncio.to_thread(self.run_sensor_analysis, state))
-        permit_task = asyncio.create_task(asyncio.to_thread(self.run_permit_analysis, state))
-        maint_task = asyncio.create_task(asyncio.to_thread(self.run_maintenance_analysis, state))
-        await asyncio.gather(sensor_task, permit_task, maint_task)
         state = self.fuse_and_rank(state)
         return {
             "risk_score": state["fused_risk_score"], "severity": state["fused_severity"],
@@ -145,8 +146,4 @@ class CompoundRiskDetectionEngine:
         }
 
     def run(self, plant_state: Dict) -> Dict:
-        try:
-            loop = asyncio.get_running_loop()
-            return loop.run_until_complete(self.run_async(plant_state))
-        except RuntimeError:
-            return asyncio.run(self.run_async(plant_state))
+        return asyncio.run(self.run_async(plant_state))

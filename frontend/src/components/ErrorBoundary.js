@@ -1,4 +1,5 @@
 import React from 'react';
+import { COLORS } from '../store/theme';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -19,10 +20,10 @@ export default class ErrorBoundary extends React.Component {
       return (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          height: '100vh', background: '#0a0e17', color: '#e0e5ec', fontFamily: 'sans-serif', padding: 20, textAlign: 'center'
+          height: '100vh', background: COLORS.bgModal, color: COLORS.text, fontFamily: 'sans-serif', padding: 20, textAlign: 'center'
         }}>
           <h1 style={{ fontSize: 24, marginBottom: 12 }}>Something went wrong</h1>
-          <p style={{ color: '#9ca3af', marginBottom: 20 }}>
+          <p style={{ color: COLORS.textSecondary, marginBottom: 20 }}>
             {this.state.error?.message || 'An unexpected error occurred'}
           </p>
           <button

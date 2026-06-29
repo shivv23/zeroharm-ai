@@ -1,64 +1,53 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import ws from './store/websocketStore';
-import GeospatialHeatmap from './components/GeospatialHeatmap';
-import RiskPanel from './components/RiskPanel';
-import AlertPanel from './components/AlertPanel';
-import PermitIntelligence from './components/PermitIntelligence';
-import EmergencyResponse from './components/EmergencyResponse';
-import IncidentPatterns from './components/IncidentPatterns';
-import ActivityFeed from './components/ActivityFeed';
-import RiskTrendChart from './components/RiskTrendChart';
-import WhatIfSimulator from './components/WhatIfSimulator';
-import CompliancePanel from './components/CompliancePanel';
+import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
+import MobileDashboard from './components/MobileDashboard';
+import PushNotificationManager from './components/PushNotificationManager';
 import { PLANT_ZONES, getRiskColor } from './store/plantData';
 
-const TABS = [
-  { id: 'heatmap', label: 'Heatmap', icon: '\u{1F3E0}' },
-  { id: 'alerts', label: 'Alerts', icon: '\u{26A0}\uFE0F' },
-  { id: 'permits', label: 'Permits', icon: '\u{1F4CB}' },
-  { id: 'compliance', label: 'Audit', icon: '\u{1F4DD}' },
-  { id: 'emergency', label: 'Emergency', icon: '\u{1F6A8}' },
-  { id: 'scenarios', label: 'What-If', icon: '\u{1F9E9}' },
-  { id: 'feed', label: 'Agents', icon: '\u{1F916}' },
-  { id: 'patterns', label: 'Patterns', icon: '\u{1F50D}' },
-];
+const GeospatialHeatmap = lazy(() => import('./components/GeospatialHeatmap'));
+const RiskPanel = lazy(() => import('./components/RiskPanel'));
+const AlertPanel = lazy(() => import('./components/AlertPanel'));
+const PermitIntelligence = lazy(() => import('./components/PermitIntelligence'));
+const EmergencyResponse = lazy(() => import('./components/EmergencyResponse'));
+const IncidentPatterns = lazy(() => import('./components/IncidentPatterns'));
+const IncidentInvestigation = lazy(() => import('./components/IncidentInvestigation'));
+const ActivityFeed = lazy(() => import('./components/ActivityFeed'));
+const RiskTrendChart = lazy(() => import('./components/RiskTrendChart'));
+const WhatIfSimulator = lazy(() => import('./components/WhatIfSimulator'));
+const CompliancePanel = lazy(() => import('./components/CompliancePanel'));
+
+import { APP_TABS as TABS, COLORS, FONT, LAYOUT, ALERT_AUDIO, TOAST_DURATION, SX } from './store/theme';
 
 const SEVERITY_SCORE = { critical: 4, high: 3, warning: 2, info: 1 };
-const ALERT_FREQUENCY_HZ = 880;
-const ALERT_GAIN = 0.1;
-const ALERT_DURATION_S = 0.5;
-const TOAST_DEFAULT_DURATION = 5000;
-const TOAST_SUCCESS_DURATION = 3000;
-const TOAST_CRITICAL_DURATION = 8000;
-const TOAST_WARNING_DURATION = 5000;
-const TOAST_EMERGENCY_DURATION = 10000;
-const TOAST_SCENARIO_DURATION = 4000;
-const NARROW_THRESHOLD = 1100;
-const MINI_CHART_WIDTH = 80;
-const MINI_CHART_HEIGHT = 24;
-const SIDE_PANEL_NARROW = 240;
-const SIDE_PANEL_WIDE = 340;
+const NARROW_THRESHOLD = LAYOUT.narrowThreshold;
+const MOBILE_THRESHOLD = 768;
+const MINI_CHART_WIDTH = LAYOUT.miniChartWidth;
+const MINI_CHART_HEIGHT = LAYOUT.miniChartHeight;
+const SIDE_PANEL_NARROW = LAYOUT.sidebarNarrow;
+const SIDE_PANEL_WIDE = LAYOUT.sidebarWide;
+const COLOR_HEALTH_GOOD = COLORS.healthGood;
+const COLOR_HEALTH_WARN = COLORS.healthWarn;
+const COLOR_HEALTH_CRIT = COLORS.healthCrit;
+const COLOR_STATUS_OFFLINE = COLORS.offline;
+const COLOR_BG_LOW_RISK = COLORS.bgNormal;
+const COLOR_BG_MED_RISK = COLORS.bgWarning;
+const COLOR_BG_HIGH_RISK = COLORS.bgCriticalStrong;
+const COLOR_BORDER_LOW_RISK = COLORS.borderNormal;
+const COLOR_BORDER_MED_RISK = COLORS.borderWarning;
+const COLOR_BORDER_HIGH_RISK = COLORS.borderCritical;
+const COLOR_TEXT_MUTED = COLORS.textMuted;
+const COLOR_TEXT_DIM = COLORS.textDim;
+const COLOR_ACCENT_CYAN = COLORS.accent;
+const COLOR_BG_PRIMARY = COLORS.bg;
+const COLOR_BG_HEADER = COLORS.bgHeader;
+const COLOR_BORDER_DARK = COLORS.border;
+const COLOR_BORDER_TAB = COLORS.borderTab;
 
-const COLOR_HEALTH_GOOD = '#00e676';
-const COLOR_HEALTH_WARN = '#ffa000';
-const COLOR_HEALTH_CRIT = '#ff1744';
-const COLOR_STATUS_OFFLINE = '#6b7280';
-const COLOR_BG_LOW_RISK = 'rgba(0,230,118,0.15)';
-const COLOR_BG_MED_RISK = 'rgba(255,160,0,0.2)';
-const COLOR_BG_HIGH_RISK = 'rgba(255,23,68,0.2)';
-const COLOR_BORDER_LOW_RISK = 'rgba(0,230,118,0.3)';
-const COLOR_BORDER_MED_RISK = 'rgba(255,160,0,0.4)';
-const COLOR_BORDER_HIGH_RISK = 'rgba(255,23,68,0.4)';
-const COLOR_TEXT_MUTED = '#6b7280';
-const COLOR_TEXT_DIM = '#4b5563';
-const COLOR_ACCENT_CYAN = '#00e5ff';
-const COLOR_BG_PRIMARY = '#080c16';
-const COLOR_BG_HEADER = '#0d1520';
-const COLOR_BORDER_DARK = '#1f2937';
-const COLOR_BORDER_TAB = '#1a2332';
-
-let toastId = 0;
+function TabFallback() {
+  return <div style={{ padding: 40, textAlign: 'center', color: COLOR_TEXT_MUTED }}>Loading...</div>;
+}
 
 export default function App() {
   const [connected, setConnected] = useState(false);
@@ -75,6 +64,7 @@ export default function App() {
   const [healthIndex, setHealthIndex] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const toastId = useRef(0);
 
   useEffect(() => {
     const onResize = () => setWindowWidth(window.innerWidth);
@@ -83,6 +73,7 @@ export default function App() {
   }, []);
 
   const isNarrow = windowWidth < NARROW_THRESHOLD;
+  const isMobile = windowWidth < MOBILE_THRESHOLD;
   const prevSeverity = useRef('normal');
   const prevAlertCount = useRef(0);
   const audioCtx = useRef(null);
@@ -91,21 +82,22 @@ export default function App() {
     try {
       if (!audioCtx.current) audioCtx.current = new (window.AudioContext || window.webkitAudioContext)();
       const ctx = audioCtx.current;
+      if (ctx.state === 'suspended') ctx.resume();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.frequency.value = ALERT_FREQUENCY_HZ;
+      osc.frequency.value = ALERT_AUDIO.frequency;
       osc.type = 'square';
-      gain.gain.setValueAtTime(ALERT_GAIN, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + ALERT_DURATION_S);
+      gain.gain.setValueAtTime(ALERT_AUDIO.gain, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + ALERT_AUDIO.durationS);
       osc.start();
-      osc.stop(ctx.currentTime + ALERT_DURATION_S);
+      osc.stop(ctx.currentTime + ALERT_AUDIO.durationS);
     } catch (e) { /* audio not available */ }
   }, []);
 
-  const addToast = useCallback((message, type = 'info', duration = TOAST_DEFAULT_DURATION) => {
-    const id = ++toastId;
+  const addToast = useCallback((message, type = 'info', duration = TOAST_DURATION.default) => {
+    const id = ++toastId.current;
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), duration);
   }, []);
@@ -114,47 +106,56 @@ export default function App() {
     ws.connect();
     const unsub1 = ws.on('connection', (d) => {
       setConnected(d.connected);
-      if (d.connected) addToast('Connected to ZeroHarm AI platform', 'success', TOAST_SUCCESS_DURATION);
+      if (!d.connected) addToast('Disconnected from server — showing stale data', 'warning', TOAST_DURATION.warning);
     });
     const unsub2 = ws.on('state_update', (d) => {
       setPlantState(d.plant);
       setRiskData(d.risk);
       if (d.plant?.zone_risk_scores) setZoneRisks(d.plant.zone_risk_scores);
-      if (d.risk?.alerts) setAlerts(d.risk.alerts);
-      if (d.activity_feed) setActivityFeed(d.activity_feed);
-      if (d.risk_trend) setRiskTrend(d.risk_trend);
-      if (d.compliance) setCompliance(d.compliance);
-      if (d.health_index) setHealthIndex(d.health_index);
+      if (d.risk?.alerts !== undefined) setAlerts(d.risk.alerts);
+      if (d.activity_feed !== undefined) setActivityFeed(d.activity_feed);
+      if (d.risk_trend !== undefined) setRiskTrend(d.risk_trend);
+      if (d.compliance !== undefined) setCompliance(d.compliance);
+      if (d.health_index !== undefined) setHealthIndex(d.health_index);
       const severity = d.risk?.severity || 'normal';
       const alertCount = d.risk?.alerts?.length || 0;
       if (severity === 'critical' && prevSeverity.current !== 'critical') {
-        addToast('CRITICAL: Compound risk condition detected!', 'critical', TOAST_CRITICAL_DURATION);
+        addToast('CRITICAL: Compound risk condition detected!', 'critical', TOAST_DURATION.critical);
         playAlertSound();
       }
       if (alertCount > prevAlertCount.current + 2) {
-        addToast(`${alertCount} active alerts — review recommended`, 'warning', TOAST_WARNING_DURATION);
+        addToast(`${alertCount} active alerts — review recommended`, 'warning', TOAST_DURATION.warning);
       }
       prevSeverity.current = severity;
       prevAlertCount.current = alertCount;
     });
     const unsub3 = ws.on('emergency_triggered', () => {
       setShowEmergencyModal(true);
-      addToast('EMERGENCY RESPONSE ACTIVATED', 'critical', TOAST_EMERGENCY_DURATION);
+      addToast('EMERGENCY RESPONSE ACTIVATED', 'critical', TOAST_DURATION.emergency);
     });
     const unsub4 = ws.on('what_if_applied', (d) => {
       if (d.plant) setPlantState(d.plant);
       if (d.risk) setRiskData(d.risk);
       if (d.activity) setActivityFeed(d.activity);
-      addToast('What-If scenario applied', 'warning', TOAST_SCENARIO_DURATION);
+      addToast('What-If scenario applied', 'warning', TOAST_DURATION.scenario);
     });
     const unsub5 = ws.on('what_if_reset', (d) => {
       if (d.plant) setPlantState(d.plant);
       if (d.risk) setRiskData(d.risk);
       if (d.activity) setActivityFeed(d.activity);
-      addToast('Scenario reset — normal operations', 'success', TOAST_SCENARIO_DURATION);
+      addToast('Scenario reset — normal operations', 'success', TOAST_DURATION.scenario);
     });
-    return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); ws.disconnect(); };
+    const unsub6 = ws.on('api_error', (d) => {
+      addToast(`API error ${d.status || ''}: ${d.endpoint}`, 'warning', TOAST_DURATION.warning);
+    });
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); unsub6(); ws.disconnect(); };
   }, [addToast]);
+
+  // Service worker is registered by PushNotificationManager
+
+  const handleMobileNavigate = useCallback((tab) => {
+    setActiveTab(tab);
+  }, []);
 
   const triggerEmergency = useCallback((type, context = {}) => {
     ws.send({ action: 'trigger_emergency', type, context });
@@ -171,9 +172,63 @@ export default function App() {
   const riskScore = riskData?.risk_score ?? 0;
   const severity = riskData?.severity ?? 'normal';
 
+  const renderTab = (tabId) => {
+    const content = (() => {
+      switch (tabId) {
+        case 'heatmap':
+          return <GeospatialHeatmap zones={PLANT_ZONES} zoneRisks={zoneRisks}
+            selectedZone={selectedZone} onSelectZone={setSelectedZone} plantState={plantState} />;
+        case 'alerts':
+          return <AlertPanel alerts={alerts} riskData={riskData} />;
+        case 'permits':
+          return <PermitIntelligence permits={plantState?.active_permits || []} plantState={plantState} />;
+        case 'compliance':
+          return <CompliancePanel compliance={compliance} />;
+        case 'emergency':
+          return <EmergencyResponse triggerEmergency={triggerEmergency} resolveEmergency={resolveEmergency}
+            showModal={showEmergencyModal} setShowModal={setShowEmergencyModal} plantState={plantState} />;
+        case 'scenarios':
+          return <WhatIfSimulator plantState={plantState} />;
+        case 'feed':
+          return <ActivityFeed entries={activityFeed} />;
+        case 'patterns':
+          return <IncidentPatterns />;
+        case 'investigations':
+          return <IncidentInvestigation />;
+        default:
+          return null;
+      }
+    })();
+    return <ErrorBoundary key={tabId}><Suspense fallback={<TabFallback />}>{content}</Suspense></ErrorBoundary>;
+  };
+
+  if (isMobile) {
+    return (
+      <>
+        <Toast toasts={toasts} />
+        <PushNotificationManager onNavigate={handleMobileNavigate} />
+        <MobileDashboard
+          plantState={plantState}
+          riskData={riskData}
+          alerts={alerts}
+          healthIndex={healthIndex}
+          connected={connected}
+          activeTab={activeTab === 'emergency' ? 'emergency' : activeTab === 'alerts' ? 'alerts' : activeTab === 'permits' ? 'permits' : 'dashboard'}
+          setActiveTab={setActiveTab}
+          triggerEmergency={triggerEmergency}
+        />
+      </>
+    );
+  }
+
   return (
     <div style={styles.container}>
       <Toast toasts={toasts} />
+      {!connected && plantState && (
+        <div style={styles.disconnectedBanner}>
+          {'\u{26A0}\uFE0F'} Disconnected — showing cached data. Reconnecting...
+        </div>
+      )}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           <div style={styles.logo}>
@@ -197,7 +252,7 @@ export default function App() {
         <div style={styles.headerRight}>
           {riskTrend.length > 1 && (
             <div style={{ width: MINI_CHART_WIDTH, height: MINI_CHART_HEIGHT }}>
-              <RiskTrendChart data={riskTrend} width={MINI_CHART_WIDTH} height={MINI_CHART_HEIGHT} mini />
+              <Suspense fallback={null}><RiskTrendChart data={riskTrend} width={MINI_CHART_WIDTH} height={MINI_CHART_HEIGHT} mini /></Suspense>
             </div>
           )}
           <div style={styles.headerDivider} />
@@ -236,24 +291,17 @@ export default function App() {
             ))}
           </div>
           <div style={styles.tabContent}>
-            {activeTab === 'heatmap' && (
-              <GeospatialHeatmap zones={PLANT_ZONES} zoneRisks={zoneRisks}
-                selectedZone={selectedZone} onSelectZone={setSelectedZone} plantState={plantState} />
-            )}
-            {activeTab === 'alerts' && <AlertPanel alerts={alerts} riskData={riskData} />}
-            {activeTab === 'permits' && <PermitIntelligence permits={plantState?.active_permits || []} plantState={plantState} />}
-            {activeTab === 'compliance' && <CompliancePanel compliance={compliance} />}
-            {activeTab === 'emergency' && <EmergencyResponse triggerEmergency={triggerEmergency} resolveEmergency={resolveEmergency}
-              showModal={showEmergencyModal} setShowModal={setShowEmergencyModal} plantState={plantState} />}
-            {activeTab === 'scenarios' && <WhatIfSimulator plantState={plantState} />}
-            {activeTab === 'feed' && <ActivityFeed entries={activityFeed} />}
-            {activeTab === 'patterns' && <IncidentPatterns />}
+            {renderTab(activeTab)}
           </div>
         </div>
         <div style={{...styles.sidePanel, width: isNarrow ? SIDE_PANEL_NARROW : SIDE_PANEL_WIDE}}>
-          <RiskPanel riskData={riskData} zoneRisks={zoneRisks} selectedZone={selectedZone}
-            plantState={plantState} riskTrend={riskTrend} compliance={compliance}
-            onEmergency={() => setActiveTab('emergency')} />
+          <Suspense fallback={<TabFallback />}>
+            <ErrorBoundary>
+              <RiskPanel riskData={riskData} zoneRisks={zoneRisks} selectedZone={selectedZone}
+                plantState={plantState} riskTrend={riskTrend} compliance={compliance}
+                onEmergency={() => setActiveTab('emergency')} />
+            </ErrorBoundary>
+          </Suspense>
         </div>
       </div>
     </div>
@@ -303,6 +351,10 @@ const styles = {
   activeTab: {
     color: COLOR_ACCENT_CYAN, borderBottomColor: COLOR_ACCENT_CYAN,
     background: 'linear-gradient(0deg, rgba(0,229,255,0.06) 0%, transparent 100%)',
+  },
+  disconnectedBanner: {
+    background: 'rgba(255,109,0,0.2)', color: '#ffa000', textAlign: 'center',
+    padding: '4px 16px', fontSize: 11, fontWeight: 600, borderBottom: '1px solid rgba(255,109,0,0.3)',
   },
   tabContent: { flex: 1, overflow: 'auto', position: 'relative' },
   sidePanel: { flexShrink: 0, borderLeft: `1px solid ${COLOR_BORDER_TAB}`, overflow: 'auto' },

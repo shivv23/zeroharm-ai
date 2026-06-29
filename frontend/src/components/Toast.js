@@ -1,10 +1,11 @@
 import React from 'react';
+import { COLORS } from '../store/theme';
 
 const TOAST_STYLES = {
-  critical: { bg: 'linear-gradient(135deg, rgba(255,23,68,0.95), rgba(213,0,0,0.9))', icon: '\u{1F525}', border: '#ff1744' },
-  warning: { bg: 'linear-gradient(135deg, rgba(255,160,0,0.9), rgba(255,109,0,0.85))', icon: '\u{26A0}\uFE0F', border: '#ffa000' },
-  success: { bg: 'linear-gradient(135deg, rgba(0,230,118,0.9), rgba(0,200,83,0.85))', icon: '\u{2705}', border: '#00e676' },
-  info: { bg: 'linear-gradient(135deg, rgba(0,229,255,0.85), rgba(0,188,212,0.8))', icon: '\u{2139}\uFE0F', border: '#00e5ff' },
+  critical: { bg: 'linear-gradient(135deg, rgba(255,23,68,0.95), rgba(213,0,0,0.9))', icon: '\u{1F525}', border: COLORS.riskCritical },
+  warning: { bg: 'linear-gradient(135deg, rgba(255,160,0,0.9), rgba(255,109,0,0.85))', icon: '\u{26A0}\uFE0F', border: COLORS.riskElevated },
+  success: { bg: 'linear-gradient(135deg, rgba(0,230,118,0.9), rgba(0,200,83,0.85))', icon: '\u{2705}', border: COLORS.riskNormal },
+  info: { bg: 'linear-gradient(135deg, rgba(0,229,255,0.85), rgba(0,188,212,0.8))', icon: '\u{2139}\uFE0F', border: COLORS.accent },
 };
 
 export default function Toast({ toasts = [] }) {

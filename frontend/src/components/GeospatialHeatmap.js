@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { getRiskColor, getRiskLabel } from '../store/plantData';
+import { COLORS } from '../store/theme';
 
 const SENSOR_DOT_SIZE = 6;
 
@@ -41,31 +42,31 @@ export default function GeospatialHeatmap({ zones, zoneRisks, selectedZone, onSe
       {/* Title */}
       <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#e0e5ec' }}>{'\u{1F3E0}'} Geospatial Safety Heatmap</div>
-          <div style={{ fontSize: 11, color: '#6b7280' }}>Visakhapatnam Steel Plant · Real-time risk overlay</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>{'\u{1F3E0}'} Geospatial Safety Heatmap</div>
+          <div style={{ fontSize: 11, color: COLORS.textMuted }}>Visakhapatnam Steel Plant · Real-time risk overlay</div>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{ width: 12, height: 12, borderRadius: 2, background: '#00e676' }} />
-            <span style={{ fontSize: 10, color: '#9ca3af' }}>Normal</span>
+            <div style={{ width: 12, height: 12, borderRadius: 2, background: COLORS.riskNormal }} />
+            <span style={{ fontSize: 10, color: COLORS.textSecondary }}>Normal</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{ width: 12, height: 12, borderRadius: 2, background: '#ffa000' }} />
-            <span style={{ fontSize: 10, color: '#9ca3af' }}>Elevated</span>
+            <div style={{ width: 12, height: 12, borderRadius: 2, background: COLORS.riskElevated }} />
+            <span style={{ fontSize: 10, color: COLORS.textSecondary }}>Elevated</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{ width: 12, height: 12, borderRadius: 2, background: '#ff6d00' }} />
-            <span style={{ fontSize: 10, color: '#9ca3af' }}>High</span>
+            <div style={{ width: 12, height: 12, borderRadius: 2, background: COLORS.riskHigh }} />
+            <span style={{ fontSize: 10, color: COLORS.textSecondary }}>High</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{ width: 12, height: 12, borderRadius: 2, background: '#ff1744' }} />
-            <span style={{ fontSize: 10, color: '#9ca3af' }}>Critical</span>
+            <div style={{ width: 12, height: 12, borderRadius: 2, background: COLORS.riskCritical }} />
+            <span style={{ fontSize: 10, color: COLORS.textSecondary }}>Critical</span>
           </div>
         </div>
       </div>
 
       {/* Plant SVG */}
-      <div style={{ flex: 1, position: 'relative', background: '#0d1520', borderRadius: 12, border: '1px solid #1f2937', overflow: 'hidden' }}>
+      <div style={{ flex: 1, position: 'relative', background: COLORS.bgElevated, borderRadius: 12, border: '1px solid ' + COLORS.border, overflow: 'hidden' }}>
         <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
           {/* Zones */}
           {zones.map(zone => {
@@ -89,7 +90,7 @@ export default function GeospatialHeatmap({ zones, zoneRisks, selectedZone, onSe
                 {/* Hazard class badge */}
                 {zone.hazard === 'Extreme' && (
                   <text x={zone.x + zone.w / 2} y={zone.y + 8}
-                        textAnchor="middle" fontSize="2.5" fill="#ff1744" fontWeight="700">
+                        textAnchor="middle" fontSize="2.5" fill={COLORS.riskCritical} fontWeight="700">
                     {'\u26A0\uFE0F'} EXTREME
                   </text>
                 )}
@@ -99,7 +100,7 @@ export default function GeospatialHeatmap({ zones, zoneRisks, selectedZone, onSe
 
           {/* Sensor dots */}
           {sensorPositions.map((s, i) => {
-            const color = s.status === 'critical' ? '#ff1744' : s.status === 'warning' ? '#ffa000' : '#00e676';
+            const color = s.status === 'critical' ? COLORS.riskCritical : s.status === 'warning' ? COLORS.riskElevated : COLORS.riskNormal;
             return (
               <g key={s.id || i}>
                 <circle cx={s.x} cy={s.y} r={s.status === 'critical' ? 2 : 1.5}
@@ -116,7 +117,7 @@ export default function GeospatialHeatmap({ zones, zoneRisks, selectedZone, onSe
           {/* Permit indicators */}
           {permitIndicators.map((p, i) => (
             <g key={`permit-${i}`}>
-              <circle cx={p.x} cy={p.y} r={3} fill={p.critical ? '#ff1744' : '#ffa000'}
+              <circle cx={p.x} cy={p.y} r={3} fill={p.critical ? COLORS.riskCritical : COLORS.riskElevated}
                       stroke="#fff" strokeWidth="0.5" />
               <text x={p.x} y={p.y + 1} textAnchor="middle" fontSize="2.2" fill="#fff" fontWeight="700">
                 {p.count}
@@ -125,13 +126,13 @@ export default function GeospatialHeatmap({ zones, zoneRisks, selectedZone, onSe
           ))}
 
           {/* Connections between related zones */}
-          <line x1="30" y1="25" x2="40" y2="19" stroke="#ff1744" strokeWidth="0.3" strokeOpacity="0.3" strokeDasharray="1,1" />
-          <line x1="30" y1="25" x2="68" y2="18" stroke="#ff6d00" strokeWidth="0.3" strokeOpacity="0.3" strokeDasharray="1,1" />
-          <line x1="62" y1="19" x2="68" y2="72" stroke="#ff1744" strokeWidth="0.3" strokeOpacity="0.3" strokeDasharray="1,1" />
+          <line x1="30" y1="25" x2="40" y2="19" stroke={COLORS.riskCritical} strokeWidth="0.3" strokeOpacity="0.3" strokeDasharray="1,1" />
+          <line x1="30" y1="25" x2="68" y2="18" stroke={COLORS.riskHigh} strokeWidth="0.3" strokeOpacity="0.3" strokeDasharray="1,1" />
+          <line x1="62" y1="19" x2="68" y2="72" stroke={COLORS.riskCritical} strokeWidth="0.3" strokeOpacity="0.3" strokeDasharray="1,1" />
 
           {/* Legend overlay for zone names */}
           <rect x="1" y="93" width="40" height="6" rx="2" fill="rgba(0,0,0,0.5)" />
-          <text x="3" y="97" fontSize="2.5" fill="#9ca3af">
+          <text x="3" y="97" fontSize="2.5" fill={COLORS.textSecondary}>
             {new Date().toLocaleTimeString()} · {sensors.length} sensors · {permits.length} active permits
           </text>
         </svg>
@@ -142,7 +143,7 @@ export default function GeospatialHeatmap({ zones, zoneRisks, selectedZone, onSe
           background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: 6,
         }}>
           <div style={overlayBtn}>All zones</div>
-          <div style={{ ...overlayBtn, background: 'rgba(0,229,255,0.2)', color: '#00e5ff' }}>Risk only</div>
+          <div style={{ ...overlayBtn, background: 'rgba(0,229,255,0.2)', color: COLORS.accent }}>Risk only</div>
           <div style={overlayBtn}>Sensors</div>
         </div>
       </div>
@@ -150,13 +151,13 @@ export default function GeospatialHeatmap({ zones, zoneRisks, selectedZone, onSe
       {/* Selected Zone Detail */}
       {selectedZone && (
         <div style={{
-          marginTop: 8, padding: '8px 12px', background: '#111827', borderRadius: 8,
-          border: '1px solid #1f2937', display: 'flex', alignItems: 'center', gap: 12,
+          marginTop: 8, padding: '8px 12px', background: COLORS.bgCard, borderRadius: 8,
+          border: '1px solid ' + COLORS.border, display: 'flex', alignItems: 'center', gap: 12,
         }}>
           <div style={{ width: 4, height: 32, borderRadius: 2, background: getRiskColor(zoneRisks?.[selectedZone.id] ?? 0) }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 600 }}>{selectedZone.name}</div>
-            <div style={{ fontSize: 11, color: '#6b7280' }}>{selectedZone.description}</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>{selectedZone.description}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: getRiskColor(zoneRisks?.[selectedZone.id] ?? 0) }}>
@@ -164,7 +165,7 @@ export default function GeospatialHeatmap({ zones, zoneRisks, selectedZone, onSe
                 ? (zoneRisks[selectedZone.id] * 100).toFixed(0) + '%'
                 : '--'}
             </div>
-            <div style={{ fontSize: 10, color: '#6b7280' }}>
+            <div style={{ fontSize: 10, color: COLORS.textMuted }}>
               {getRiskLabel(zoneRisks?.[selectedZone.id] ?? 0)}
             </div>
           </div>
@@ -175,6 +176,6 @@ export default function GeospatialHeatmap({ zones, zoneRisks, selectedZone, onSe
 }
 
 const overlayBtn = {
-  padding: '2px 8px', borderRadius: 4, fontSize: 10, color: '#9ca3af',
+  padding: '2px 8px', borderRadius: 4, fontSize: 10, color: COLORS.textSecondary,
   cursor: 'pointer', background: 'rgba(255,255,255,0.05)',
 };

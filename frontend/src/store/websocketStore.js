@@ -1,10 +1,8 @@
-const WS_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+import { WS_URL, API_BASE } from './apiRoutes';
 
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 const RECONNECT_MAX_RETRIES = 20;
-const COMPLIANCE_TREND_PAYLOAD_COUNT = 10;
 
 class ZeroHarmWebSocket {
   constructor() {
@@ -15,15 +13,21 @@ class ZeroHarmWebSocket {
     this.plantState = null;
     this.riskData = null;
     this._reconnectAttempts = 0;
+    this._intentionalDisconnect = false;
+    this._sendQueue = [];
   }
 
   connect() {
+    this._intentionalDisconnect = false;
+    this._reconnectAttempts = 0;
     try {
       this.ws = new WebSocket(WS_URL);
       this.ws.onopen = () => {
         this.isConnected = true;
         this._reconnectAttempts = 0;
+        this._flushQueue();
         this.notify('connection', { connected: true });
+        this.send({ action: 'sync_state' });
       };
       this.ws.onmessage = (event) => {
         try {
@@ -38,15 +42,19 @@ class ZeroHarmWebSocket {
         }
       };
       this.ws.onclose = () => {
-        this.isConnected = false;
-        this.notify('connection', { connected: false });
-        this._scheduleReconnect();
+        if (this.isConnected) {
+          this.isConnected = false;
+          this.notify('connection', { connected: false });
+        }
+        if (!this._intentionalDisconnect) {
+          this._scheduleReconnect();
+        }
       };
-      this.ws.onerror = () => {
-        this.ws.close();
-      };
+      this.ws.onerror = () => {};
     } catch (e) {
-      this._scheduleReconnect();
+      if (!this._intentionalDisconnect) {
+        this._scheduleReconnect();
+      }
     }
   }
 
@@ -64,6 +72,7 @@ class ZeroHarmWebSocket {
   }
 
   disconnect() {
+    this._intentionalDisconnect = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     if (this.ws) this.ws.close();
     this._reconnectAttempts = RECONNECT_MAX_RETRIES;
@@ -72,6 +81,18 @@ class ZeroHarmWebSocket {
   send(data) {
     if (this.ws && this.isConnected) {
       this.ws.send(JSON.stringify(data));
+      return true;
+    }
+    this._sendQueue.push(data);
+    return false;
+  }
+
+  _flushQueue() {
+    while (this._sendQueue.length > 0) {
+      const msg = this._sendQueue.shift();
+      if (this.ws && this.isConnected) {
+        this.ws.send(JSON.stringify(msg));
+      }
     }
   }
 
@@ -90,7 +111,12 @@ class ZeroHarmWebSocket {
   }
 
   notify(event, data) {
-    this.listeners.get(event)?.forEach(cb => cb(data));
+    const cbs = this.listeners.get(event);
+    if (cbs) {
+      cbs.forEach(cb => {
+        try { cb(data); } catch (e) { console.error('WS listener error:', e); }
+      });
+    }
   }
 
   async fetchAPI(endpoint, options = {}) {
@@ -98,9 +124,16 @@ class ZeroHarmWebSocket {
       const fetchOpts = { method: options.method || 'GET', headers: { 'Content-Type': 'application/json', ...options.headers } };
       if (options.body) fetchOpts.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
       const res = await fetch(`${API_BASE}${endpoint}`, fetchOpts);
+      if (!res.ok) {
+        const errMsg = `API error ${res.status}: ${endpoint}`;
+        console.error(errMsg);
+        this.notify('api_error', { endpoint, status: res.status });
+        return null;
+      }
       return await res.json();
     } catch (e) {
       console.error(`API fetch error: ${endpoint}`, e);
+      this.notify('api_error', { endpoint, error: e.message });
       return null;
     }
   }

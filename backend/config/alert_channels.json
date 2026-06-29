@@ -1,0 +1,11 @@
+{
+  "slack": {"enabled": false, "webhook_url": ""},
+  "email": {"enabled": false, "smtp_server": "", "smtp_port": 587, "smtp_user": "", "smtp_pass": "", "to": ""},
+  "sms": {"enabled": false, "twilio_account_sid": "", "twilio_auth_token": "", "twilio_from": "", "to": ""},
+  "dispatch_rules": {
+    "critical": {"slack": true, "email": true, "sms": true},
+    "high": {"slack": true, "email": true, "sms": false},
+    "warning": {"slack": true, "email": false, "sms": false},
+    "info": {"slack": false, "email": false, "sms": false}
+  }
+}

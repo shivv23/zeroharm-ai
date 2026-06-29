@@ -2,41 +2,85 @@
   "gas_leak": {
     "type": "gas_leak",
     "label": "Gas Leak - Emergency Response",
+    "priority": "IMMEDIATE",
     "alert_channels": ["plant_sirens", "slack_safety_channel", "telegram_safety", "sms_managers"],
     "evacuation_radius": 100,
     "requires_shutdown": true,
-    "requires_rescue_team": true
+    "requires_rescue_team": true,
+    "steps": [
+      "Activate area emergency alarm",
+      "Isolate gas source (close isolation valves)",
+      "Initiate emergency shutdown of affected equipment",
+      "Evacuate all personnel from affected zone",
+      "Establish wind direction monitoring",
+      "Deploy gas monitoring team with portable detectors",
+      "Establish exclusion zone (minimum 100m downwind)",
+      "Notify plant fire brigade and local authorities",
+      "Begin rescue operations only with appropriate PPE and breathing apparatus",
+      "Conduct headcount at assembly point"
+    ],
+    "regulations": ["OISD-STD-116", "Factory-Act-1948-Sec37"]
   },
   "fire": {
     "type": "fire",
     "label": "Fire - Emergency Response",
+    "priority": "IMMEDIATE",
     "alert_channels": ["plant_sirens", "fire_brigade_pager", "slack_safety_channel", "sms_all"],
     "evacuation_radius": 200,
     "requires_shutdown": true,
-    "requires_rescue_team": true
+    "requires_rescue_team": true,
+    "steps": [
+      "Activate fire alarm",
+      "Call plant fire brigade with location details",
+      "Initiate emergency shutdown of fuel sources",
+      "Activate fixed fire suppression systems",
+      "Evacuate all personnel from affected zone and adjacent zones",
+      "Establish water supply for firefighting operations",
+      "Set up incident command post upwind of fire",
+      "Account for all personnel at assembly point",
+      "Do NOT re-enter until declared safe by fire officer",
+      "Preserve area for incident investigation after fire is controlled"
+    ],
+    "regulations": ["OISD-STD-105", "OISD-STD-116", "Factory-Act-1948-Sec38"]
   },
   "confined_space_emergency": {
     "type": "confined_space_emergency",
-    "label": "Confined Space Rescue",
+    "label": "Confined Space Rescue Emergency",
+    "priority": "IMMEDIATE",
     "alert_channels": ["local_alarm", "rescue_team_pager", "slack_safety_channel"],
     "evacuation_radius": 50,
     "requires_shutdown": false,
-    "requires_rescue_team": true
-  },
-  "explosion": {
-    "type": "explosion",
-    "label": "Explosion - Full Site Emergency",
-    "alert_channels": ["plant_sirens", "fire_brigade_pager", "sms_all", "local_authorities", "district_control"],
-    "evacuation_radius": 500,
-    "requires_shutdown": true,
-    "requires_rescue_team": true
+    "requires_rescue_team": true,
+    "steps": [
+      "Sound emergency alarm",
+      "Call designated rescue team",
+      "DO NOT enter confined space without breathing apparatus",
+      "Activate forced ventilation if available",
+      "Monitor atmosphere continuously",
+      "Prepare rescue tripod and winch system",
+      "Rescue team to enter with full PPE, SCBA, and lifeline",
+      "Remove victim to fresh air immediately",
+      "Administer first aid / CPR if required",
+      "Transport to medical facility"
+    ],
+    "regulations": ["Factory-Act-1948-Sec36", "OISD-STD-116"]
   },
   "medical_emergency": {
     "type": "medical_emergency",
-    "label": "Medical Emergency",
+    "label": "Medical Emergency Response",
+    "priority": "HIGH",
     "alert_channels": ["slack_safety_channel", "sms_managers", "medical_center_pager"],
     "evacuation_radius": 0,
     "requires_shutdown": false,
-    "requires_rescue_team": false
+    "requires_rescue_team": false,
+    "steps": [
+      "Call plant medical center / ambulance",
+      "Provide first aid / basic life support",
+      "Do NOT move victim unless area is unsafe",
+      "Keep victim warm and comfortable",
+      "Provide details to medical team on arrival",
+      "Notify next of kin through HR department"
+    ],
+    "regulations": ["Factory-Act-1948-Sec7A"]
   }
 }

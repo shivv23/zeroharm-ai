@@ -1,0 +1,6 @@
+{
+  "action_types": ["corrective", "preventive", "disciplinary", "training", "engineering_control", "admin_control", "ppe_control"],
+  "status_flow": ["open", "in_progress", "completed", "verified", "closed"],
+  "severity_levels": ["critical", "high", "medium", "low"],
+  "root_cause_categories": ["human_error", "equipment_failure", "procedure_gap", "training_deficit", "environmental", "management_system"]
+}

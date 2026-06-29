@@ -1,0 +1,9 @@
+{
+  "patterns": [
+    {"permit_type": "Confined Space Entry", "sensor_type": "O2", "risk": "Oxygen deficiency during confined space entry", "regulation": "Factory-Act-1948-Sec36", "threshold_key": "confined_space_o2_threshold", "default_threshold": 19.0, "invert_comparison": true},
+    {"permit_type": "Hot Work", "sensor_type": "LEL", "risk": "Flammable atmosphere during hot work", "regulation": "Factory-Act-1948-Sec37", "threshold_key": "hot_work_lel_threshold", "default_threshold": 10.0},
+    {"permit_type": "Confined Space Entry", "sensor_type": "H2S", "risk": "Toxic gas during confined space entry", "regulation": "Factory-Act-1948-Sec36", "threshold_key": "confined_space_h2s_threshold", "default_threshold": 5.0},
+    {"permit_type": "Confined Space Entry", "sensor_type": "LEL", "risk": "Flammable atmosphere during confined space entry", "regulation": "Factory-Act-1948-Sec37", "threshold_key": "confined_space_lel_threshold", "default_threshold": 10.0},
+    {"permit_type": "Hot Work", "sensor_type": "CO", "risk": "Carbon monoxide during hot work", "regulation": "Factory-Act-1948-Sec37", "threshold_key": "hot_work_co_threshold", "default_threshold": 50.0}
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "gas_detection": {
+    "title": "Gas Detection System Compliance",
+    "standard": "OISD-STD-116",
+    "checks": [
+      {"id": "GD-01", "description": "Gas detectors calibrated within last 90 days", "weight": 0.2},
+      {"id": "GD-02", "description": "No gas detectors in bypass/bypass logged", "weight": 0.15},
+      {"id": "GD-03", "description": "Alarm response time < 60 seconds (drilled quarterly)", "weight": 0.15},
+      {"id": "GD-04", "description": "Audible and visual alarms functional in all zones", "weight": 0.1},
+      {"id": "GD-05", "description": "Gas detector coverage meets zone hazard classification requirements", "weight": 0.2},
+      {"id": "GD-06", "description": "Emergency shutdown interface tested (monthly)", "weight": 0.1},
+      {"id": "GD-07", "description": "Gas detector data logged and reviewable for 90 days", "weight": 0.1}
+    ]
+  },
+  "permit_to_work": {
+    "title": "Permit-to-Work System Compliance",
+    "standard": "Factory Act 1948 / OISD-GDN-204",
+    "checks": [
+      {"id": "PTW-01", "description": "All high-risk permits reviewed by safety officer", "weight": 0.2},
+      {"id": "PTW-02", "description": "Permit validity period does not exceed shift duration", "weight": 0.1},
+      {"id": "PTW-03", "description": "Atmospheric test results attached to confined space permits", "weight": 0.2},
+      {"id": "PTW-04", "description": "SIMOPS review conducted for overlapping permits in same zone", "weight": 0.15},
+      {"id": "PTW-05", "description": "Permit closure includes post-work inspection sign-off", "weight": 0.1},
+      {"id": "PTW-06", "description": "Worker training/certification verified before permit issuance", "weight": 0.15},
+      {"id": "PTW-07", "description": "Emergency contact numbers listed on all permits", "weight": 0.1}
+    ]
+  },
+  "maintenance_safety": {
+    "title": "Maintenance Safety Compliance",
+    "standard": "OISD-STD-201 / Factory Act 1948 Sec 7A",
+    "checks": [
+      {"id": "MS-01", "description": "LOTO procedure followed for all maintenance work", "weight": 0.25},
+      {"id": "MS-02", "description": "Equipment isolation verified by second qualified person", "weight": 0.2},
+      {"id": "MS-03", "description": "Maintenance procedures include hazard identification step", "weight": 0.15},
+      {"id": "MS-04", "description": "Spare parts and tools inspected before use", "weight": 0.1},
+      {"id": "MS-05", "description": "Post-maintenance testing completed before return to service", "weight": 0.15},
+      {"id": "MS-06", "description": "Maintenance records updated within 24 hours", "weight": 0.15}
+    ]
+  },
+  "training_competency": {
+    "title": "Training & Competency Compliance",
+    "standard": "Factory Act 1948 Sec 7A / ISO 45001 Clause 7.2",
+    "checks": [
+      {"id": "TC-01", "description": "All workers have current safety training certifications", "weight": 0.2},
+      {"id": "TC-02", "description": "Emergency response drills conducted quarterly", "weight": 0.2},
+      {"id": "TC-03", "description": "Permit issuers trained and authorized", "weight": 0.15},
+      {"id": "TC-04", "description": "First aid trained personnel available on every shift", "weight": 0.15},
+      {"id": "TC-05", "description": "Confined space rescue team trained bi-annually", "weight": 0.15},
+      {"id": "TC-06", "description": "New worker safety induction completed before site access", "weight": 0.15}
+    ]
+  },
+  "emergency_preparedness": {
+    "title": "Emergency Preparedness Compliance",
+    "standard": "OISD-STD-105 / Factory Act 1948 Sec 38",
+    "checks": [
+      {"id": "EP-01", "description": "Emergency evacuation plan posted in all zones", "weight": 0.15},
+      {"id": "EP-02", "description": "Assembly points clearly marked and maintained", "weight": 0.1},
+      {"id": "EP-03", "description": "Fire extinguishers inspected monthly", "weight": 0.15},
+      {"id": "EP-04", "description": "Emergency lighting tested weekly", "weight": 0.1},
+      {"id": "EP-05", "description": "Fire water system flow tested quarterly", "weight": 0.2},
+      {"id": "EP-06", "description": "Emergency communication systems tested weekly", "weight": 0.15},
+      {"id": "EP-07", "description": "Mutual aid agreements with neighboring plants current", "weight": 0.15}
+    ]
+  }
+}

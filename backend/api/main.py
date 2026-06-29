@@ -3,26 +3,34 @@ import copy
 import json
 import logging
 import os
+import time
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict
+from io import BytesIO
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-import uvicorn
+load_dotenv()
 
 import constants as C
 from api.schemas import (
+    LoginRequest, RegisterRequest, TokenResponse, UserResponse,
     PermitComplianceRequest, RAGSearchRequest, EmergencyTriggerRequest,
     EmergencyResolveRequest, WhatIfApplyRequest, WhatIfCustomRequest,
+    VisionDetectRequest, VisionRTSPStartRequest, VisionRTSPStopRequest,
+    CreateInvestigationRequest, AddFindingRequest, CreateCapaRequest,
+    UpdateCapaStatusRequest,
 )
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-load_dotenv()
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
+from fastapi.responses import JSONResponse, StreamingResponse
+import uvicorn
 
+from auth.auth_manager import AuthManager
 from data.synthetic_data_generator import SyntheticDataGenerator
 from agents.compound_risk_engine import CompoundRiskDetectionEngine
 from agents.quality_compliance_agent import QualityComplianceAuditAgent
@@ -32,9 +40,40 @@ from rag.rag_pipeline import RAGPipeline
 from orchestrator.emergency_response import EmergencyResponseOrchestrator
 from orchestrator.incident_pattern_intelligence import IncidentPatternIntelligence
 from orchestrator.what_if_simulator import WhatIfSimulator
+from orchestrator.incident_investigation import IncidentInvestigation
+from report_generator import ReportGenerator
+from database import init_db, save_plant_state, save_sensor_reading, save_permit, save_compliance_audit, save_alert, get_recent_plant_states
+from alert_dispatcher import AlertDispatcher
+from vision.integration import VisionIntegration
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=getattr(logging, C.LOG_LEVEL, logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
 logger = logging.getLogger("zeroharm-api")
+
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+_ip_request_log: Dict[str, list] = {}
+_ip_lock = asyncio.Lock()
+
+
+async def verify_api_key(api_key: str = Depends(_api_key_header)):
+    if C.API_KEY and api_key != C.API_KEY:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+    return api_key
+
+
+async def rate_limit(request):
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    async with _ip_lock:
+        timestamps = _ip_request_log.get(client_ip, [])
+        timestamps = [t for t in timestamps if now - t < C.RATE_LIMIT_WINDOW]
+        _ip_request_log[client_ip] = timestamps
+        if len(timestamps) >= C.RATE_LIMIT_REQUESTS:
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+        timestamps.append(now)
 
 
 def flagged_response(content, **kwargs):
@@ -54,13 +93,23 @@ class ZeroHarmAPI:
         self.compliance_agent = QualityComplianceAuditAgent()
         self.activity_feed = AgentActivityFeed()
         self.what_if = WhatIfSimulator()
+        self.incident_investigation = IncidentInvestigation()
+        self.report_generator = ReportGenerator()
+        self.alert_dispatcher = AlertDispatcher()
+        self.vision = VisionIntegration()
+        if C.VISION_ENABLED:
+            self.vision.load_model()
         self.plant_state = {}
         self.risk_trend = []
         self.active_connections = []
+        self.connections_lock = asyncio.Lock()
         self.simulation_running = False
         self.scenario_active = False
         self.scenario_state = None
         self.scenario_id = None
+        self._last_compliance_result = None
+        self._last_health_index = None
+        self._plant_snapshot = {}
 
     async def _compute_health_index(self, plant_state, risk_result, compliance_result):
         sensors = plant_state.get("sensors", {})
@@ -83,91 +132,146 @@ class ZeroHarmAPI:
 
     async def simulation_loop(self):
         step_count = 0
-        last_health_index = None
         while self.simulation_running:
             try:
+                state = self.generator.step()
                 if self.scenario_active and self.scenario_state:
-                    self.plant_state = self.generator.apply_scenario_overrides(self.plant_state, self.scenario_state)
+                    self.plant_state = self.generator.apply_scenario_overrides(state, self.scenario_state)
                 else:
-                    self.plant_state = self.generator.step()
-                risk_result = await self.risk_engine.run_async(copy.deepcopy(self.plant_state))
+                    self.plant_state = state
+                self._plant_snapshot = copy.deepcopy(self.plant_state)
+                await save_plant_state(self._plant_snapshot)
+                for sid, s in self._plant_snapshot.get("sensors", {}).items():
+                    await save_sensor_reading(s)
+                for p in self._plant_snapshot.get("active_permits", []):
+                    await save_permit(p)
+                risk_result = await self.risk_engine.run_async(copy.deepcopy(self._plant_snapshot))
                 self.risk_trend.append({
                     "timestamp": datetime.now().isoformat(),
                     "score": risk_result.get("risk_score", 0),
                     "severity": risk_result.get("severity", C.SENSOR_STATUS_NORMAL),
                 })
-                if len(self.risk_trend) > C.RISK_TREND_MAX:
+                sev = risk_result.get("severity", C.SENSOR_STATUS_NORMAL)
+                if sev in C.HIGH_RISK_LEVELS:
+                    self.alert_dispatcher.dispatch({
+                        "severity": sev,
+                        "risk_score": risk_result.get("risk_score", 0),
+                        "zone": self._plant_snapshot.get("zone", C.UNKNOWN_ZONE),
+                        "timestamp": datetime.now().isoformat(),
+                        "message": f"Risk score {risk_result.get('risk_score', 0):.2f} — {len(risk_result.get('alerts', []))} active alerts",
+                    })
+                if len(self.risk_trend) >= C.RISK_TREND_MAX:
                     self.risk_trend = self.risk_trend[-C.RISK_TREND_MAX:]
-                sensors = self.plant_state.get("sensors", {})
-                permits = self.plant_state.get("active_permits", [])
+                sensors = self._plant_snapshot.get("sensors", {})
+                permits = self._plant_snapshot.get("active_permits", [])
                 s_critical = len([s for s in sensors.values() if s.get("status") == C.SENSOR_STATUS_CRITICAL])
                 s_warning = len([s for s in sensors.values() if s.get("status") == C.SENSOR_STATUS_WARNING])
                 high_risk_permits = len([p for p in permits if p.get("risk_level") in C.HIGH_RISK_LEVELS])
-                zone_overlaps = len(set(p.get("zone_id") for p in permits if sum(1 for pp in permits if pp.get("zone_id") == p.get("zone_id")) > 1))
+                zone_ids = set(p.get("zone_id") for p in permits if p.get("zone_id"))
+                zone_overlaps = len([z for z in zone_ids if sum(1 for pp in permits if pp.get("zone_id") == z) > 1])
                 in_maint = len(risk_result.get("maintenance_analysis", {}).get("equipment_in_maintenance", []))
                 maint_conflicts = len(risk_result.get("maintenance_analysis", {}).get("maintenance_equipment_with_permits", []))
                 self.activity_feed.log_sensor_scan(len(sensors), s_critical, s_warning)
                 self.activity_feed.log_permit_audit(len(permits), high_risk_permits, zone_overlaps)
                 self.activity_feed.log_maintenance_check(in_maint, maint_conflicts)
-                self.activity_feed.log_risk_update(risk_result.get("risk_score", 0), risk_result.get("severity", C.SENSOR_STATUS_NORMAL), len(self.plant_state.get("zone_risk_scores", {})))
+                self.activity_feed.log_risk_update(risk_result.get("risk_score", 0), risk_result.get("severity", C.SENSOR_STATUS_NORMAL), len(self._plant_snapshot.get("zone_risk_scores", {})))
+                for alert in risk_result.get("alerts", []):
+                    await save_alert(alert)
                 compound_risks = risk_result.get("compound_risks", [])
                 if compound_risks:
                     for cr in compound_risks[:C.MAX_COMPOUND_RISKS_TO_LOG]:
                         self.activity_feed.log_compound_risk(cr.get("zone_name", ""), 1, cr.get("recommendation", ""))
                 step_count += 1
                 if step_count % C.COMPLIANCE_AUDIT_INTERVAL == 0:
-                    compliance_result = await asyncio.to_thread(self.compliance_agent.run_audit, copy.deepcopy(self.plant_state))
+                    compliance_result = await asyncio.to_thread(self.compliance_agent.run_audit, copy.deepcopy(self._plant_snapshot))
+                    self._last_compliance_result = compliance_result
+                    await save_compliance_audit(compliance_result)
                     v_count = len(compliance_result.get("violations", []))
                     c_count = len(compliance_result.get("critical_findings", []))
                     self.activity_feed.log_compliance_audit(compliance_result[C.OVERALL_COMPLIANCE_SCORE_KEY], v_count, c_count)
-                    last_health_index = await self._compute_health_index(self.plant_state, risk_result, compliance_result)
-                else:
-                    compliance_result = None
+                    self._last_health_index = await self._compute_health_index(self._plant_snapshot, risk_result, compliance_result)
                 payload = {
                     "type": "state_update",
                     "timestamp": datetime.now().isoformat(),
-                    "plant": self.plant_state,
+                    "plant": self._plant_snapshot,
                     "risk": risk_result,
                     "activity_feed": self.activity_feed.get_recent(C.ACTIVITY_FEED_PAYLOAD_COUNT),
                     "risk_trend": self.risk_trend[-C.RISK_TREND_PAYLOAD_COUNT:],
-                    "compliance": compliance_result,
-                    "health_index": last_health_index,
+                    "compliance": self._last_compliance_result,
+                    "health_index": self._last_health_index,
                     "scenario_active": self.scenario_active,
                     "scenario_id": self.scenario_id,
                 }
                 await self.broadcast(payload)
             except Exception as e:
-                logger.error(f"Simulation step error: {e}")
+                logger.exception(f"Simulation step error")
             await asyncio.sleep(C.WS_UPDATE_INTERVAL)
 
     async def broadcast(self, message: Dict):
-        dead_connections = []
-        for connection in self.active_connections:
-            try:
-                await connection.send_json(message)
-            except Exception:
-                dead_connections.append(connection)
-        for conn in dead_connections:
-            self.active_connections.remove(conn)
+        async with self.connections_lock:
+            dead = []
+            for c in self.active_connections:
+                try:
+                    await c.send_json(message)
+                except Exception as exc:
+                    logger.warning(f"Broadcast error for connection: {exc}")
+                    dead.append(c)
+            if dead:
+                self.active_connections[:] = [c for c in self.active_connections if c not in dead]
 
 
 api = ZeroHarmAPI()
+auth_manager = AuthManager()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    user = auth_manager.verify_token(token)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    return user
+
+
+def require_role(role: str):
+    async def role_dependency(user: dict = Depends(get_current_user)):
+        if user.get("role") != role:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Role '{role}' required")
+        return user
+    return role_dependency
+
+
+def require_permission(permission: str):
+    async def permission_dependency(user: dict = Depends(get_current_user)):
+        if not auth_manager.check_permission(user, resource=permission):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Permission '{permission}' required")
+        return user
+    return permission_dependency
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("ZeroHarm AI Platform starting...")
+    await init_db()
+    if not api.plant_state:
+        recent = await get_recent_plant_states(1)
+        if recent:
+            api.plant_state = recent[0]
+            api._plant_snapshot = copy.deepcopy(api.plant_state)
+            logger.info("Loaded plant state from database")
     api.simulation_running = True
     loop_task = asyncio.create_task(api.simulation_loop())
     yield
     api.simulation_running = False
     loop_task.cancel()
-    for ws in api.active_connections:
-        try:
-            await ws.close(code=1001, reason="Server shutting down")
-        except Exception:
-            pass
-    api.active_connections.clear()
+    async with api.connections_lock:
+        for ws in api.active_connections:
+            try:
+                await ws.close(code=1001, reason="Server shutting down")
+            except Exception:
+                pass
+        api.active_connections.clear()
     logger.info("ZeroHarm AI Platform shutting down...")
 
 
@@ -179,11 +283,21 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=C.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=C.ALLOWED_ORIGINS if C.ALLOWED_ORIGINS != ["*"] else ["*"],
+    allow_credentials=C.ALLOWED_ORIGINS != ["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-API-Key"],
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
 
 
 @app.get("/api/health")
@@ -196,38 +310,68 @@ async def health():
     }
 
 
-@app.get("/api/plant/layout")
+@app.post("/api/auth/login")
+async def auth_login(data: LoginRequest):
+    user = auth_manager.authenticate(data.username, data.password)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+    token = auth_manager.create_token(user["username"])
+    return TokenResponse(access_token=token)
+
+
+@app.post("/api/auth/register", dependencies=[Depends(require_permission("manage_users"))])
+async def auth_register(data: RegisterRequest):
+    created = auth_manager.create_user(data.username, data.password, data.role, data.tenant_id, data.name)
+    if not created:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
+    return {"detail": "User created", "username": data.username, "role": data.role}
+
+
+@app.get("/api/auth/me", dependencies=[Depends(get_current_user)])
+async def auth_me(user: dict = Depends(get_current_user)):
+    return UserResponse(
+        username=user["username"],
+        role=user["role"],
+        tenant_id=user["tenant_id"],
+        name=user.get("name", user["username"]),
+    )
+
+
+@app.get("/api/plant/layout", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_plant_layout():
     return flagged_response(api.generator.get_plant_layout_data())
 
 
-@app.get("/api/plant/state")
+@app.get("/api/plant/state", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_plant_state():
     if not api.plant_state:
         api.plant_state = api.generator.step()
-    return flagged_response(api.plant_state)
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
+    return flagged_response(api._plant_snapshot)
 
 
-@app.get("/api/risk/current")
+@app.get("/api/risk/current", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_current_risk():
-    if not api.plant_state:
+    if not api._plant_snapshot:
         api.plant_state = api.generator.step()
-    risk_result = await api.risk_engine.run_async(api.plant_state)
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
+    risk_result = await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
     return flagged_response(risk_result)
 
 
-@app.get("/api/risk/alerts")
+@app.get("/api/risk/alerts", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_alerts():
-    if not api.plant_state:
+    if not api._plant_snapshot:
         api.plant_state = api.generator.step()
-    risk_result = await api.risk_engine.run_async(api.plant_state)
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
+    risk_result = await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
     return flagged_response({"alerts": risk_result.get("alerts", []),
                              "severity": risk_result.get("severity", C.SENSOR_STATUS_NORMAL),
                              "risk_score": risk_result.get("risk_score", 0),
                              "count": len(risk_result.get("alerts", []))})
 
 
-@app.get("/api/kg/query")
+@app.get("/api/kg/query", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def query_knowledge_graph(zone_id: str = "Z01", permit_type: str = C.DEFAULT_PERMIT_TYPE,
                                   sensor_type: str = "O2", value: float = 18.5):
     findings = api.knowledge_graph.query_compound_risk_paths(
@@ -236,13 +380,13 @@ async def query_knowledge_graph(zone_id: str = "Z01", permit_type: str = C.DEFAU
     return flagged_response({"findings": findings, "zone_id": zone_id, "permit_type": permit_type})
 
 
-@app.get("/api/kg/regulatory/{hazard_type}")
+@app.get("/api/kg/regulatory/{hazard_type}", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_regulatory_context(hazard_type: str):
     context = api.knowledge_graph.get_regulatory_context(hazard_type)
     return flagged_response({"hazard_type": hazard_type, "regulations": context})
 
 
-@app.post("/api/rag/permit-compliance")
+@app.post("/api/rag/permit-compliance", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
 async def check_permit_compliance(data: PermitComplianceRequest):
     permit_type = data.permit_type
     zone_hazard = data.zone_hazard_class
@@ -251,7 +395,7 @@ async def check_permit_compliance(data: PermitComplianceRequest):
     return flagged_response(result)
 
 
-@app.post("/api/rag/search")
+@app.post("/api/rag/search", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
 async def search_documents(data: RAGSearchRequest):
     query = data.query
     top_k = data.top_k
@@ -259,28 +403,35 @@ async def search_documents(data: RAGSearchRequest):
     return flagged_response({"query": query, "results": results})
 
 
-@app.post("/api/emergency/trigger")
+@app.post("/api/emergency/trigger", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
 async def trigger_emergency(data: EmergencyTriggerRequest):
     incident_type = data.type
     context = data.context
-    if not api.plant_state:
+    if not api._plant_snapshot:
         api.plant_state = api.generator.step()
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
     context.setdefault("sensor_snapshot",
                         {sid: {"type": s["type"], "value": s["value"], "unit": s["unit"], "status": s["status"]}
-                         for sid, s in api.plant_state.get("sensors", {}).items()})
-    context.setdefault("permit_snapshot", api.plant_state.get("active_permits", []))
+                         for sid, s in api._plant_snapshot.get("sensors", {}).items()})
+    context.setdefault("permit_snapshot", api._plant_snapshot.get("active_permits", []))
     context.setdefault("personnel_in_zone", [])
     response = api.emergency_response.trigger(incident_type, context)
+    if response.get("status") == "active":
+        inv = api.incident_investigation.create_investigation({
+            "type": incident_type, "emergency_id": response.get("id"),
+            "description": response.get("label", incident_type), "context": context,
+        })
+        response["investigation_id"] = inv["id"]
     return flagged_response(response)
 
 
-@app.get("/api/emergency/active")
+@app.get("/api/emergency/active", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_active_emergencies():
     emergencies = api.emergency_response.get_active_emergencies()
     return flagged_response({"active_count": len(emergencies), "emergencies": emergencies})
 
 
-@app.post("/api/emergency/resolve/{emergency_id}")
+@app.post("/api/emergency/resolve/{emergency_id}", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
 async def resolve_emergency(emergency_id: str, data: EmergencyResolveRequest = None):
     notes = data.notes if data else ""
     result = api.emergency_response.resolve(emergency_id, notes)
@@ -289,64 +440,133 @@ async def resolve_emergency(emergency_id: str, data: EmergencyResolveRequest = N
     return flagged_response(result)
 
 
-@app.get("/api/incident-patterns")
+@app.get("/api/incident-patterns", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_incident_patterns():
     patterns = api.incident_patterns.get_all_patterns()
     stats = api.incident_patterns.get_statistics()
     return flagged_response({"patterns": patterns, "statistics": stats})
 
 
-@app.get("/api/incident-patterns/zone/{zone_id}")
+@app.get("/api/incident-patterns/zone/{zone_id}", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_zone_patterns(zone_id: str):
     patterns = api.incident_patterns.get_zone_patterns(zone_id)
     return flagged_response({"zone_id": zone_id, "patterns": patterns})
 
 
-@app.get("/api/incident-patterns/recommendations")
+@app.get("/api/incident-patterns/recommendations", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_prevention_recommendations(zone_id: str = "Z01", permit_type: str = C.DEFAULT_PERMIT_TYPE):
     recs = api.incident_patterns.get_prevention_recommendations(zone_id, permit_type)
     return flagged_response({"zone_id": zone_id, "permit_type": permit_type, "recommendations": recs})
 
 
-@app.get("/api/sensors")
+@app.post("/api/investigation/create", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
+async def create_investigation(data: CreateInvestigationRequest):
+    inv = api.incident_investigation.create_investigation(data.incident_data)
+    return flagged_response(inv)
+
+
+@app.post("/api/investigation/{investigation_id}/finding", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
+async def add_finding(investigation_id: str, data: AddFindingRequest):
+    finding = api.incident_investigation.add_finding(investigation_id, data.finding)
+    if not finding:
+        raise HTTPException(status_code=404, detail=f"Investigation {investigation_id} not found")
+    return flagged_response(finding)
+
+
+@app.get("/api/investigation/list", dependencies=[Depends(require_permission("read")), Depends(verify_api_key), Depends(rate_limit)])
+async def list_investigations():
+    return flagged_response(api.incident_investigation.list_investigations())
+
+
+@app.post("/api/investigation/{investigation_id}/capa", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
+async def create_capa(investigation_id: str, data: CreateCapaRequest):
+    capa = api.incident_investigation.create_capa(
+        investigation_id, data.finding, data.action_type, data.description, data.owner, data.deadline
+    )
+    if not capa:
+        raise HTTPException(status_code=404, detail=f"Investigation {investigation_id} not found")
+    return flagged_response(capa)
+
+
+@app.put("/api/capa/{capa_id}/status", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
+async def update_capa_status(capa_id: str, data: UpdateCapaStatusRequest):
+    capa = api.incident_investigation.update_capa_status(capa_id, data.status)
+    if not capa:
+        raise HTTPException(status_code=404, detail=f"CAPA {capa_id} not found or invalid status")
+    return flagged_response(capa)
+
+
+@app.get("/api/investigation/{investigation_id}", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_investigation(investigation_id: str):
+    inv = api.incident_investigation.get_investigation(investigation_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail=f"Investigation {investigation_id} not found")
+    return flagged_response(inv)
+
+
+@app.get("/api/capa/open", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_open_capas():
+    capas = api.incident_investigation.get_open_capas()
+    return flagged_response({"open_capas": capas, "count": len(capas)})
+
+
+@app.get("/api/capa/statistics", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_capa_statistics():
+    stats = api.incident_investigation.get_capa_statistics()
+    return flagged_response(stats)
+
+
+@app.get("/api/investigation/{investigation_id}/report", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_investigation_report(investigation_id: str):
+    report = api.incident_investigation.get_investigation_report(investigation_id)
+    if not report:
+        raise HTTPException(status_code=404, detail=f"Investigation {investigation_id} not found")
+    return flagged_response(report)
+
+
+@app.get("/api/sensors", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_all_sensors():
-    if not api.plant_state:
+    if not api._plant_snapshot:
         api.plant_state = api.generator.step()
-    sensors = api.plant_state.get("sensors", {})
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
+    sensors = api._plant_snapshot.get("sensors", {})
     return flagged_response({"sensor_count": len(sensors), "sensors": sensors})
 
 
-@app.get("/api/sensors/zone/{zone_id}")
+@app.get("/api/sensors/zone/{zone_id}", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_zone_sensors(zone_id: str):
-    if not api.plant_state:
+    if not api._plant_snapshot:
         api.plant_state = api.generator.step()
-    sensors = {sid: s for sid, s in api.plant_state.get("sensors", {}).items() if s.get("zone_id") == zone_id}
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
+    sensors = {sid: s for sid, s in api._plant_snapshot.get("sensors", {}).items() if s.get("zone_id") == zone_id}
     return flagged_response({"zone_id": zone_id, "sensor_count": len(sensors), "sensors": sensors})
 
 
-@app.get("/api/permits")
+@app.get("/api/permits", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_active_permits():
-    if not api.plant_state:
+    if not api._plant_snapshot:
         api.plant_state = api.generator.step()
-    return flagged_response({"active_permits": api.plant_state.get("active_permits", [])})
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
+    return flagged_response({"active_permits": api._plant_snapshot.get("active_permits", [])})
 
 
-@app.get("/api/knowledge-graph")
+@app.get("/api/knowledge-graph", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_knowledge_graph():
     kg_data = api.knowledge_graph.to_dict()
     return flagged_response(kg_data)
 
 
-@app.get("/api/export/compliance")
+@app.get("/api/export/compliance", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def export_compliance_report():
-    if not api.plant_state:
+    if not api._plant_snapshot:
         api.plant_state = api.generator.step()
-    compliance = await asyncio.to_thread(api.compliance_agent.run_audit, api.plant_state)
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
+    compliance = await asyncio.to_thread(api.compliance_agent.run_audit, copy.deepcopy(api._plant_snapshot))
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     lines = [
         f"ZeroHarm AI Compliance Report",
         f"Generated: {timestamp}",
-        f"Plant: {api.plant_state.get('plant_name', C.UNKNOWN_LABEL)}",
+        f"Plant: {api._plant_snapshot.get('plant_name', C.UNKNOWN_LABEL)}",
         f"Data Source: {C.DATA_SOURCE_LABEL_EXPORT}",
         f"",
         f"Overall Compliance Score,{compliance[C.OVERALL_COMPLIANCE_SCORE_KEY]}%",
@@ -369,143 +589,336 @@ async def export_compliance_report():
     )
 
 
-@app.get("/api/regulatory-standards")
+@app.get("/api/regulatory-standards", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_regulatory_standards():
     from config_loader import get_regulatory_standards as _grs
     return flagged_response({"standards": _grs()})
 
 
-@app.get("/api/compliance/audit")
+@app.get("/api/compliance/audit", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_compliance_audit():
-    if not api.plant_state:
+    if not api._plant_snapshot:
         api.plant_state = api.generator.step()
-    result = await asyncio.to_thread(api.compliance_agent.run_audit, api.plant_state)
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
+    result = await asyncio.to_thread(api.compliance_agent.run_audit, copy.deepcopy(api._plant_snapshot))
     return flagged_response(result)
 
 
-@app.get("/api/compliance/trend")
+@app.get("/api/compliance/trend", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_compliance_trend():
     trend = api.compliance_agent.get_compliance_trend()
     recs = api.compliance_agent.get_actionable_recommendations()
     return flagged_response({"trend": trend, "recommendations": recs})
 
 
-@app.get("/api/activity-feed")
+@app.get("/api/activity-feed", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_activity_feed(count: int = 20):
+    count = max(1, min(count, 200))
     return flagged_response({"entries": api.activity_feed.get_recent(count)})
 
 
-@app.get("/api/risk-trend")
+@app.get("/api/risk-trend", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_risk_trend():
     return flagged_response({"trend": api.risk_trend, "current_score": api.risk_trend[-1]["score"] if api.risk_trend else 0})
 
 
-@app.get("/api/what-if/scenarios")
+@app.get("/api/what-if/scenarios", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def list_what_if_scenarios():
     return flagged_response({"scenarios": api.what_if.list_scenarios()})
 
 
-@app.post("/api/what-if/apply")
+@app.post("/api/what-if/apply", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
 async def apply_what_if_scenario(data: WhatIfApplyRequest):
     scenario_id = data.scenario_id
-    if not api.plant_state:
+    if not api._plant_snapshot:
         api.plant_state = api.generator.step()
-    modified = api.what_if.apply_scenario(scenario_id, api.plant_state)
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
+    modified = api.what_if.apply_scenario(scenario_id, copy.deepcopy(api._plant_snapshot))
     if "error" in modified:
-        raise HTTPException(status_code=404, detail=modified["error"])
+        raise HTTPException(status_code=404, detail="Scenario not found")
     api.scenario_active = True
     api.scenario_state = copy.deepcopy(modified)
     api.scenario_id = scenario_id
     risk_result = await api.risk_engine.run_async(modified)
+    sev = risk_result.get("severity", C.SENSOR_STATUS_NORMAL)
+    if sev in C.HIGH_RISK_LEVELS:
+        api.alert_dispatcher.dispatch({
+            "severity": sev,
+            "risk_score": risk_result.get("risk_score", 0),
+            "zone": modified.get("zone", C.UNKNOWN_ZONE),
+            "timestamp": datetime.now().isoformat(),
+            "message": f"What-If scenario '{scenario_id}' applied — risk {risk_result.get('risk_score', 0):.2f}",
+        })
     api.activity_feed.log_system(f"What-If scenario '{scenario_id}' applied — {risk_result.get('severity', C.UNKNOWN_LABEL)}")
     return flagged_response({"plant": modified, "risk": risk_result, "activity": api.activity_feed.get_recent(5),
                              "scenario_active": True, "scenario_id": scenario_id})
 
 
-@app.post("/api/what-if/custom")
+@app.post("/api/what-if/custom", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
 async def apply_custom_scenario(data: WhatIfCustomRequest):
-    if not api.plant_state:
+    if not api._plant_snapshot:
         api.plant_state = api.generator.step()
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
     changes = data.changes
     permits = data.permits_to_add
     scenario_name = data.name
-    modified = api.what_if.apply_custom(api.plant_state, changes, permits, scenario_name)
+    modified = api.what_if.apply_custom(api._plant_snapshot, changes, permits, scenario_name)
     api.scenario_active = True
     api.scenario_state = copy.deepcopy(modified)
     api.scenario_id = "custom"
     risk_result = await api.risk_engine.run_async(modified)
+    sev = risk_result.get("severity", C.SENSOR_STATUS_NORMAL)
+    if sev in C.HIGH_RISK_LEVELS:
+        api.alert_dispatcher.dispatch({
+            "severity": sev,
+            "risk_score": risk_result.get("risk_score", 0),
+            "zone": modified.get("zone", C.UNKNOWN_ZONE),
+            "timestamp": datetime.now().isoformat(),
+            "message": f"Custom scenario '{scenario_name}' applied — risk {risk_result.get('risk_score', 0):.2f}",
+        })
     api.activity_feed.log_system(f"Custom scenario '{scenario_name}' applied — {risk_result.get('severity', C.UNKNOWN_LABEL)}")
     return flagged_response({"plant": modified, "risk": risk_result, "activity": api.activity_feed.get_recent(5),
                              "scenario_active": True})
 
 
-@app.post("/api/what-if/reset")
+@app.post("/api/what-if/reset", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
 async def reset_what_if_scenario():
     api.scenario_active = False
     api.scenario_state = None
     api.scenario_id = None
     api.plant_state = api.generator.step()
+    api._plant_snapshot = copy.deepcopy(api.plant_state)
     api.activity_feed.log_system("What-If scenario reset — normal operations restored")
-    risk_result = await api.risk_engine.run_async(api.plant_state)
-    return flagged_response({"plant": api.plant_state, "risk": risk_result, "activity": api.activity_feed.get_recent(5)})
+    risk_result = await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
+    sev = risk_result.get("severity", C.SENSOR_STATUS_NORMAL)
+    if sev in C.HIGH_RISK_LEVELS:
+        api.alert_dispatcher.dispatch({
+            "severity": sev,
+            "risk_score": risk_result.get("risk_score", 0),
+            "zone": api._plant_snapshot.get("zone", C.UNKNOWN_ZONE),
+            "timestamp": datetime.now().isoformat(),
+            "message": f"Scenario reset — residual risk {risk_result.get('risk_score', 0):.2f}",
+        })
+    return flagged_response({"plant": api._plant_snapshot, "risk": risk_result, "activity": api.activity_feed.get_recent(5)})
 
 
-@app.get("/api/health-index")
+@app.post("/api/vision/detect", dependencies=[Depends(require_permission("write")), Depends(rate_limit)])
+async def vision_detect(data: VisionDetectRequest):
+    if not C.VISION_ENABLED:
+        raise HTTPException(status_code=503, detail="Vision module is disabled")
+    if not api.vision.is_loaded:
+        raise HTTPException(status_code=503, detail="YOLO model not loaded")
+    try:
+        import base64
+        import numpy as np
+        import cv2
+        raw = data.image_bytes or data.base64
+        if not raw:
+            raise HTTPException(status_code=400, detail="No image data provided")
+        decoded = base64.b64decode(raw)
+        arr = np.frombuffer(decoded, dtype=np.uint8)
+        frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if frame is None:
+            raise HTTPException(status_code=400, detail="Invalid image data")
+        detections = api.vision.process_frame(frame)
+        ppe_counts = api.vision.detect_ppe(frame)
+        return flagged_response({
+            "detections": detections,
+            "ppe_counts": ppe_counts,
+            "processed_at": datetime.now().isoformat(),
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Vision detect error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/vision/rtsp/start", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
+async def vision_rtsp_start(data: VisionRTSPStartRequest):
+    if not C.VISION_ENABLED:
+        raise HTTPException(status_code=503, detail="Vision module is disabled")
+    if not api.vision.is_loaded:
+        raise HTTPException(status_code=503, detail="YOLO model not loaded")
+
+    def rtsp_callback(detections):
+        violations = api.vision.get_safety_violations_from_detections(detections, "Z01")
+        for v in violations:
+            api.alert_dispatcher.dispatch(v)
+
+    ok = api.vision.process_rtsp_stream(data.rtsp_url, rtsp_callback)
+    if not ok:
+        raise HTTPException(status_code=409, detail="Stream already active or failed to start")
+    return {"status": "started", "rtsp_url": data.rtsp_url}
+
+
+@app.post("/api/vision/rtsp/stop", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
+async def vision_rtsp_stop(data: VisionRTSPStopRequest):
+    ok = api.vision.stop_rtsp_stream(data.rtsp_url)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Stream not found or not active")
+    return {"status": "stopped", "rtsp_url": data.rtsp_url}
+
+
+@app.get("/api/vision/status", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def vision_status():
+    return flagged_response(api.vision.get_status())
+
+
+@app.get("/api/health-index", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_health_index():
-    if not api.plant_state:
+    if not api._plant_snapshot:
         api.plant_state = api.generator.step()
-    risk = await api.risk_engine.run_async(api.plant_state)
-    compliance = await asyncio.to_thread(api.compliance_agent.run_audit, api.plant_state)
-    return flagged_response(await api._compute_health_index(api.plant_state, risk, compliance))
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
+    risk = await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
+    compliance = await asyncio.to_thread(api.compliance_agent.run_audit, copy.deepcopy(api._plant_snapshot))
+    return flagged_response(await api._compute_health_index(api._plant_snapshot, risk, compliance))
+
+
+@app.get("/api/reports/compliance", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_compliance_report():
+    if not api._plant_snapshot:
+        api.plant_state = api.generator.step()
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
+    compliance = await asyncio.to_thread(api.compliance_agent.run_audit, copy.deepcopy(api._plant_snapshot))
+    timestamp = datetime.now().isoformat()
+    plant_name = api._plant_snapshot.get("plant_name", api.report_generator._cfg.get("company_name", C.PLANT_NAME))
+    if api.report_generator._cfg.get("include_recommendations", True):
+        compliance["recommendations"] = api.compliance_agent.get_actionable_recommendations()
+    pdf_bytes = await asyncio.to_thread(api.report_generator.generate_compliance_report, compliance, plant_name, timestamp)
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=compliance_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"},
+    )
+
+
+@app.get("/api/reports/risk", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_risk_report():
+    if not api._plant_snapshot:
+        api.plant_state = api.generator.step()
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
+    risk = await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
+    timestamp = datetime.now().isoformat()
+    pdf_bytes = await asyncio.to_thread(api.report_generator.generate_risk_report, risk, api._plant_snapshot, timestamp)
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=risk_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"},
+    )
+
+
+@app.get("/api/reports/incident/{incident_id}", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_incident_report(incident_id: str):
+    emergencies = api.emergency_response.get_active_emergencies()
+    em = next((e for e in emergencies if e["id"] == incident_id), None)
+    if not em:
+        all_emergencies = api.emergency_response.active_emergencies
+        em = next((e for e in all_emergencies if e["id"] == incident_id), None)
+    if not em:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+    incident_data = em.get("incident_report", {})
+    if not incident_data:
+        raise HTTPException(status_code=404, detail=f"No report data for incident {incident_id}")
+    incident_data["severity"] = em.get("severity", em.get("type", "unknown"))
+    plant_name = api._plant_snapshot.get("plant_name", api.report_generator._cfg.get("company_name", C.PLANT_NAME)) if api._plant_snapshot else C.PLANT_NAME
+    pdf_bytes = await asyncio.to_thread(api.report_generator.generate_incident_report, incident_data, plant_name)
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=incident_report_{incident_id}.pdf"},
+    )
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    origin = websocket.headers.get("origin", "")
+    allowed = C.ALLOWED_ORIGINS if C.ALLOWED_ORIGINS != ["*"] else []
+    if allowed and origin not in allowed:
+        await websocket.close(code=1008, reason="Origin not allowed")
+        return
     await websocket.accept()
-    api.active_connections.append(websocket)
+    async with api.connections_lock:
+        if len(api.active_connections) >= C.MAX_WS_CONNECTIONS:
+            await websocket.close(code=1008, reason="Too many connections")
+            return
+        api.active_connections.append(websocket)
     logger.info(f"Client connected. Total: {len(api.active_connections)}")
     try:
         while True:
-            data = await websocket.receive_text()
+            raw = await websocket.receive_text()
+            if len(raw) > C.MAX_WS_MESSAGE_SIZE:
+                await websocket.send_json({"type": "error", "message": "Message too large"})
+                continue
             try:
-                msg = json.loads(data)
-                if msg.get("action") == "trigger_emergency":
+                msg = json.loads(raw)
+                action = msg.get("action", "")
+                if action == "trigger_emergency":
                     response = api.emergency_response.trigger(
                         msg.get("type", C.DEFAULT_INCIDENT_TYPE),
                         msg.get("context", {}),
                     )
                     await websocket.send_json({"type": "emergency_triggered", "data": response})
-                elif msg.get("action") == "resolve_emergency":
+                elif action == "resolve_emergency":
                     result = api.emergency_response.resolve(
                         msg.get("emergency_id", ""),
                         msg.get("notes", ""),
                     )
                     await websocket.send_json({"type": "emergency_resolved", "data": result})
-                elif msg.get("action") == "get_plant_state":
-                    if not api.plant_state:
+                elif action == "get_plant_state":
+                    if not api._plant_snapshot:
                         api.plant_state = api.generator.step()
-                    await websocket.send_json({"type": "plant_state", "data": api.plant_state})
-                elif msg.get("action") == "what_if_apply":
-                    modified = api.what_if.apply_scenario(msg.get("scenario_id", ""), api.plant_state)
+                        api._plant_snapshot = copy.deepcopy(api.plant_state)
+                    await websocket.send_json({"type": "plant_state", "data": api._plant_snapshot})
+                elif action == "what_if_apply":
+                    modified = api.what_if.apply_scenario(msg.get("scenario_id", ""), copy.deepcopy(api._plant_snapshot))
                     if "error" not in modified:
                         api.scenario_active = True
                         api.scenario_state = copy.deepcopy(modified)
                         api.scenario_id = msg.get("scenario_id", "")
-                        risk_r = await api.risk_engine.run_async(modified)
+                        risk_result = await api.risk_engine.run_async(modified)
+                        sev = risk_result.get("severity", C.SENSOR_STATUS_NORMAL)
+                        if sev in C.HIGH_RISK_LEVELS:
+                            api.alert_dispatcher.dispatch({
+                                "severity": sev,
+                                "risk_score": risk_result.get("risk_score", 0),
+                                "zone": modified.get("zone", C.UNKNOWN_ZONE),
+                                "timestamp": datetime.now().isoformat(),
+                                "message": f"WS What-If scenario applied — risk {risk_result.get('risk_score', 0):.2f}",
+                            })
                         api.activity_feed.log_system("What-If scenario applied via WebSocket")
-                        await websocket.send_json({"type": "what_if_applied", "plant": modified, "risk": risk_r, "activity": api.activity_feed.get_recent(10)})
-                elif msg.get("action") == "what_if_reset":
+                        await websocket.send_json({"type": "what_if_applied", "plant": modified, "risk": risk_result, "activity": api.activity_feed.get_recent(10)})
+                    else:
+                        await websocket.send_json({"type": "error", "message": "Scenario not found"})
+                elif action == "what_if_reset":
                     api.scenario_active = False
                     api.scenario_state = None
                     api.scenario_id = None
                     api.plant_state = api.generator.step()
-                    risk_r = await api.risk_engine.run_async(api.plant_state)
+                    api._plant_snapshot = copy.deepcopy(api.plant_state)
+                    risk_result = await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
+                    sev = risk_result.get("severity", C.SENSOR_STATUS_NORMAL)
+                    if sev in C.HIGH_RISK_LEVELS:
+                        api.alert_dispatcher.dispatch({
+                            "severity": sev,
+                            "risk_score": risk_result.get("risk_score", 0),
+                            "zone": api._plant_snapshot.get("zone", C.UNKNOWN_ZONE),
+                            "timestamp": datetime.now().isoformat(),
+                            "message": f"WS scenario reset — residual risk {risk_result.get('risk_score', 0):.2f}",
+                        })
                     api.activity_feed.log_system("What-If scenario reset")
-                    await websocket.send_json({"type": "what_if_reset", "plant": api.plant_state, "risk": risk_r, "activity": api.activity_feed.get_recent(10)})
+                    await websocket.send_json({"type": "what_if_reset", "plant": api._plant_snapshot, "risk": risk_result, "activity": api.activity_feed.get_recent(10)})
+                elif action == "sync_state":
+                    if api._plant_snapshot:
+                        await websocket.send_json({"type": "state_update", "plant": api._plant_snapshot})
             except json.JSONDecodeError:
                 await websocket.send_json({"type": "error", "message": "Invalid JSON"})
+            except Exception as e:
+                logger.error(f"WebSocket message error: {e}")
+                await websocket.send_json({"type": "error", "message": "Internal error processing message"})
     except WebSocketDisconnect:
-        api.active_connections[:] = [c for c in api.active_connections if c is not websocket]
+        async with api.connections_lock:
+            api.active_connections[:] = [c for c in api.active_connections if c is not websocket]
         logger.info(f"Client disconnected. Total: {len(api.active_connections)}")
 
 

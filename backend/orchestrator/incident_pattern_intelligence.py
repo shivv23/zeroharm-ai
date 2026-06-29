@@ -1,5 +1,5 @@
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from typing import Dict, List
+from datetime import datetime
 
 from config_loader import get_incident_records, get_zones, get_agent_settings
 import constants as C
@@ -67,7 +67,8 @@ class IncidentPatternIntelligence:
         return self.patterns
 
     def get_zone_patterns(self, zone_id: str) -> List[Dict]:
-        return [p for p in self.patterns if p.get("zone", "").startswith(zone_id)]
+        zone_name = self._zone_name_map.get(zone_id, "")
+        return [p for p in self.patterns if p.get("zone", "") == zone_name]
 
     def get_prevention_recommendations(self, zone_id: str, permit_type: str) -> List[str]:
         zone_name = self._zone_name_map.get(zone_id, "")
