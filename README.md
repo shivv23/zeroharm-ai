@@ -45,8 +45,16 @@ ZeroHarm AI bridges the gap between raw sensor data and safety-critical decision
 | **Plant Health Index** | Composite KPI (sensor + permit + risk + compliance) |
 | **Agent Activity Feed** | Real-time scrolling multi-agent trace |
 | **Incident Pattern Intelligence** | Historical incident analysis with pattern discovery |
+| **Database Persistence** | SQLite via SQLAlchemy — state survives restarts |
+| **Real Alert Dispatch** | Slack webhook, SMTP email, Twilio SMS dispatch per severity |
+| **Semantic Search RAG** | sentence-transformers embeddings over regulatory documents |
+| **PDF Reports** | Compliance, incident, and risk assessment PDFs via ReportLab |
+| **YOLOv8 Computer Vision** | PPE detection, zone violation alerts, RTSP stream processing |
+| **RBAC + Multi-Tenant Auth** | JWT tokens, bcrypt passwords, 4 roles with permission matrix |
+| **Incident Investigation + CAPA** | 5-Why analysis, fishbone diagrams, CAPA workflow (open→closed) |
+| **Mobile PWA** | Offline-capable, push notifications, touch-optimized field worker dashboard |
 
-> **Note:** All sensor data, alerts, and compliance outputs are generated from synthetic simulation data. Marked with `data_source: simulated` in every API response. *Computer vision, mobile app, and real-time CCTV integration are not yet implemented.*
+> **Note:** All sensor data, alerts, and compliance outputs are generated from synthetic simulation data. Marked with `data_source: simulated` in every API response.
 
 ---
 
@@ -89,13 +97,17 @@ Frontend (React 18) ←── WebSocket + REST ──→ API Gateway (FastAPI)
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18 |
+| Frontend | React 18, PWA (service worker + manifest) |
 | Backend | FastAPI + Uvicorn |
 | Communication | WebSocket (real-time) + REST |
 | Knowledge Graph | NetworkX |
-| RAG | Keyword search over regulatory documents |
-| Data Generation | NumPy, Pandas |
+| RAG | semantic-search (sentence-transformers) + keyword fallback |
+| Data Generation | NumPy |
 | Containerization | Docker, docker-compose |
+| Database | SQLite + SQLAlchemy (async) |
+| Auth | JWT + bcrypt |
+| Vision | YOLOv8 (Ultralytics) |
+| PDF | ReportLab |
 
 ---
 
@@ -106,7 +118,7 @@ Frontend (React 18) ←── WebSocket + REST ──→ API Gateway (FastAPI)
 ```bash
 docker compose up -d
 # Backend: http://localhost:8000
-# Frontend: http://localhost:3000
+# Frontend: http://localhost:8080
 # API docs: http://localhost:8000/docs
 ```
 
@@ -135,14 +147,20 @@ Interactive Swagger docs available at `http://localhost:8000/docs` when the back
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/health` | GET | Health check |
+| `/api/auth/login` | POST | JWT login |
+| `/api/auth/register` | POST | Register user |
+| `/api/auth/me` | GET | Current user info |
 | `/api/plant/state` | GET | Current plant sensor and permit state |
 | `/api/risk/current` | GET | Current risk analysis |
+| `/api/risk/alerts` | GET | Active alerts |
 | `/api/risk-trend` | GET | Risk score time-series |
+| `/api/sensors` | GET | All sensor readings |
+| `/api/permits` | GET | Active permits |
 | `/api/compliance/audit` | GET | Quality & compliance audit |
 | `/api/compliance/trend` | GET | Compliance history + recommendations |
-| `/api/export/compliance` | GET | Compliance report (CSV format) |
-| `/api/activity-feed` | GET | Multi-agent activity log |
 | `/api/health-index` | GET | Composite plant health score |
+| `/api/kg/query` | GET | Knowledge graph query |
+| `/api/regulatory/{hazard}` | GET | Regulatory context for hazard type |
 | `/api/what-if/scenarios` | GET | List available scenarios |
 | `/api/what-if/apply` | POST | Apply a built-in scenario |
 | `/api/what-if/custom` | POST | Apply a custom scenario |
@@ -150,7 +168,21 @@ Interactive Swagger docs available at `http://localhost:8000/docs` when the back
 | `/api/emergency/trigger` | POST | Trigger emergency response |
 | `/api/emergency/active` | GET | Active emergencies |
 | `/api/rag/permit-compliance` | POST | RAG-based permit compliance check |
+| `/api/rag/search` | POST | Semantic search over regulatory docs |
 | `/api/incident-patterns` | GET | Incident patterns and statistics |
+| `/api/investigation/list` | GET | List investigations |
+| `/api/investigation/create` | POST | Create investigation |
+| `/api/investigation/{id}/finding` | POST | Add finding to investigation |
+| `/api/investigation/{id}/capa` | POST | Create CAPA item |
+| `/api/investigation/capa/{id}/status` | PUT | Update CAPA status |
+| `/api/reports/compliance` | GET | PDF compliance report |
+| `/api/reports/incident/{id}` | GET | PDF incident report |
+| `/api/reports/risk` | GET | PDF risk assessment |
+| `/api/vision/detect` | POST | YOLOv8 object detection on image |
+| `/api/vision/rtsp/start` | POST | Start RTSP stream processing |
+| `/api/vision/rtsp/stop` | POST | Stop RTSP stream |
+| `/api/vision/status` | GET | Vision system status |
+| `/api/activity-feed` | GET | Multi-agent activity log |
 | `/ws` | WebSocket | Real-time state updates (2s interval) |
 
 ---
@@ -183,17 +215,38 @@ zeroharm-ai/
 │   │   └── agent_activity_feed.py
 │   ├── orchestrator/            # Coordination layer
 │   │   ├── emergency_response.py
+│   │   ├── incident_investigation.py
 │   │   ├── incident_pattern_intelligence.py
 │   │   └── what_if_simulator.py
-│   ├── rag/rag_pipeline.py      # Regulatory document RAG
+│   ├── rag/
+│   │   ├── rag_pipeline.py      # Regulatory document RAG
+│   │   └── semantic_search.py   # sentence-transformers embeddings
 │   ├── knowledge_graph/         # NetworkX knowledge graph
-│   └── data/                    # Synthetic data engine
-├── frontend/                    # React dashboard
+│   ├── auth/auth_manager.py     # JWT + bcrypt RBAC
+│   ├── vision/integration.py    # YOLOv8 computer vision
+│   ├── config/                  # 16 JSON config files
+│   ├── database.py              # SQLAlchemy async persistence
+│   ├── alert_dispatcher.py      # Slack/email/SMS dispatch
+│   ├── report_generator.py      # PDF reports via ReportLab
+│   ├── data/                    # Synthetic data engine
+│   ├── constants.py             # Env-based configuration
+│   └── config_loader.py         # JSON config loader
+├── frontend/
+│   ├── public/
+│   │   ├── service-worker.js    # PWA: offline cache + push
+│   │   ├── manifest.json        # PWA manifest
+│   │   └── offline.html         # Offline fallback
 │   └── src/
-│       ├── components/          # All UI components
-│       └── store/               # WebSocket + data store
+│       ├── App.js               # Main dashboard
+│       ├── components/          # All UI components (15 files)
+│       │   ├── MobileDashboard.js     # Mobile PWA dashboard
+│       │   ├── IncidentInvestigation.js # CAPA workflow UI
+│       │   └── PushNotificationManager.js
+│       └── store/               # WebSocket + theme + routes
+│           ├── theme.js         # Design system (all visual constants)
+│           └── apiRoutes.js     # Centralized API paths
 ├── scripts/                     # Test and utility scripts
-├── docs/                        # Architecture documentation
+├── docs/                        # Architecture documentation + screenshots
 ├── docker-compose.yml
 ├── Makefile
 └── .env.example
@@ -207,13 +260,10 @@ This is a hackathon prototype with simulated data. Key gaps vs. a production sys
 
 | Gap | Priority | Notes |
 |-----|----------|-------|
-| Computer vision (PPE, fall, CCTV) | 🔴 High | Problem statement explicitly requires this |
-| Mobile / field worker app | 🔴 High | Problem statement mentions field alerts |
-| Database persistence | 🟡 Medium | All state is in-memory, lost on restart |
-| User authentication & roles | 🟡 Medium | No safety officer / operator distinction |
-| Real alert dispatch (Slack/SMS) | 🟡 Medium | Currently simulated |
-| True ML/AI models | 🔴 High | All detection is rule-based |
-| 3D digital twin | 🟢 Low | 2D SVG heatmap only |
+| Real sensor integration | 🔴 High | Currently uses synthetic data (80 sensors, realistic noise models) |
+| Production database | 🟡 Medium | SQLite sufficient for demo; would need PostgreSQL for production |
+| 3D digital twin | 🟢 Low | 2D SVG heatmap with geospatial overlay |
+| Full test coverage | 🟡 Medium | 8 integration tests cover core agent pipeline |
 
 ---
 
