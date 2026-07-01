@@ -47,7 +47,7 @@ HIGH_RISK_PERMIT_PENALTY = float(os.getenv("HIGH_RISK_PERMIT_PENALTY", "0.15"))
 SENSOR_STATUS_NORMAL = "normal"
 SENSOR_STATUS_WARNING = "warning"
 SENSOR_STATUS_CRITICAL = "critical"
-UNKNOWN_ZONE = "unknown"
+UNKNOWN_ZONE = "plant"
 UNKNOWN_LABEL = "Unknown"
 
 # Severity values — runtime severity strings (all lowercase)

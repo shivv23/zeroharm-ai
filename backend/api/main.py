@@ -44,7 +44,12 @@ from orchestrator.incident_investigation import IncidentInvestigation
 from report_generator import ReportGenerator
 from database import init_db, save_plant_state, save_sensor_reading, save_permit, save_compliance_audit, save_alert, get_recent_plant_states
 from alert_dispatcher import AlertDispatcher
-from vision.integration import VisionIntegration
+try:
+    from vision.integration import VisionIntegration
+    _vision_available = True
+except ImportError:
+    _vision_available = False
+    VisionIntegration = None
 
 logging.basicConfig(
     level=getattr(logging, C.LOG_LEVEL, logging.INFO),
@@ -96,8 +101,8 @@ class ZeroHarmAPI:
         self.incident_investigation = IncidentInvestigation()
         self.report_generator = ReportGenerator()
         self.alert_dispatcher = AlertDispatcher()
-        self.vision = VisionIntegration()
-        if C.VISION_ENABLED:
+        self.vision = VisionIntegration() if _vision_available else None
+        if self.vision and C.VISION_ENABLED:
             self.vision.load_model()
         self.plant_state = {}
         self.risk_trend = []
@@ -109,6 +114,7 @@ class ZeroHarmAPI:
         self.scenario_id = None
         self._last_compliance_result = None
         self._last_health_index = None
+        self._last_risk_result = None
         self._plant_snapshot = {}
 
     async def _compute_health_index(self, plant_state, risk_result, compliance_result):
@@ -146,6 +152,7 @@ class ZeroHarmAPI:
                 for p in self._plant_snapshot.get("active_permits", []):
                     await save_permit(p)
                 risk_result = await self.risk_engine.run_async(copy.deepcopy(self._plant_snapshot))
+                self._last_risk_result = risk_result
                 self.risk_trend.append({
                     "timestamp": datetime.now().isoformat(),
                     "score": risk_result.get("risk_score", 0),
@@ -704,7 +711,7 @@ async def reset_what_if_scenario():
 
 @app.post("/api/vision/detect", dependencies=[Depends(require_permission("write")), Depends(rate_limit)])
 async def vision_detect(data: VisionDetectRequest):
-    if not C.VISION_ENABLED:
+    if not C.VISION_ENABLED or not api.vision:
         raise HTTPException(status_code=503, detail="Vision module is disabled")
     if not api.vision.is_loaded:
         raise HTTPException(status_code=503, detail="YOLO model not loaded")
@@ -736,7 +743,7 @@ async def vision_detect(data: VisionDetectRequest):
 
 @app.post("/api/vision/rtsp/start", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
 async def vision_rtsp_start(data: VisionRTSPStartRequest):
-    if not C.VISION_ENABLED:
+    if not C.VISION_ENABLED or not api.vision:
         raise HTTPException(status_code=503, detail="Vision module is disabled")
     if not api.vision.is_loaded:
         raise HTTPException(status_code=503, detail="YOLO model not loaded")
@@ -754,6 +761,8 @@ async def vision_rtsp_start(data: VisionRTSPStartRequest):
 
 @app.post("/api/vision/rtsp/stop", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
 async def vision_rtsp_stop(data: VisionRTSPStopRequest):
+    if not C.VISION_ENABLED or not api.vision:
+        raise HTTPException(status_code=503, detail="Vision module is disabled")
     ok = api.vision.stop_rtsp_stream(data.rtsp_url)
     if not ok:
         raise HTTPException(status_code=404, detail="Stream not found or not active")
@@ -762,6 +771,8 @@ async def vision_rtsp_stop(data: VisionRTSPStopRequest):
 
 @app.get("/api/vision/status", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def vision_status():
+    if not C.VISION_ENABLED or not api.vision:
+        raise HTTPException(status_code=503, detail="Vision module is disabled")
     return flagged_response(api.vision.get_status())
 
 
@@ -896,7 +907,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     api.scenario_id = None
                     api.plant_state = api.generator.step()
                     api._plant_snapshot = copy.deepcopy(api.plant_state)
-                    risk_result = await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
+                    api.last_risk_result = await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
+                    risk_result = api.last_risk_result
                     sev = risk_result.get("severity", C.SENSOR_STATUS_NORMAL)
                     if sev in C.HIGH_RISK_LEVELS:
                         api.alert_dispatcher.dispatch({
@@ -910,7 +922,16 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_json({"type": "what_if_reset", "plant": api._plant_snapshot, "risk": risk_result, "activity": api.activity_feed.get_recent(10)})
                 elif action == "sync_state":
                     if api._plant_snapshot:
-                        await websocket.send_json({"type": "state_update", "plant": api._plant_snapshot})
+                        risk = api.last_risk_result or await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
+                        await websocket.send_json({
+                            "type": "state_update",
+                            "plant": api._plant_snapshot,
+                            "risk": risk,
+                            "activity_feed": api.activity_feed.get_recent(C.ACTIVITY_FEED_PAYLOAD_COUNT),
+                            "risk_trend": api.risk_trend[-C.RISK_TREND_PAYLOAD_COUNT:],
+                            "compliance": api._last_compliance_result,
+                            "health_index": api._last_health_index,
+                        })
             except json.JSONDecodeError:
                 await websocket.send_json({"type": "error", "message": "Invalid JSON"})
             except Exception as e:

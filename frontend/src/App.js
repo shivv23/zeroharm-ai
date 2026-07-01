@@ -18,7 +18,7 @@ const RiskTrendChart = lazy(() => import('./components/RiskTrendChart'));
 const WhatIfSimulator = lazy(() => import('./components/WhatIfSimulator'));
 const CompliancePanel = lazy(() => import('./components/CompliancePanel'));
 
-import { APP_TABS as TABS, COLORS, FONT, LAYOUT, ALERT_AUDIO, TOAST_DURATION, SX } from './store/theme';
+import { APP_TABS as TABS, COLORS, LAYOUT, ALERT_AUDIO, TOAST_DURATION } from './store/theme';
 
 const SEVERITY_SCORE = { critical: 4, high: 3, warning: 2, info: 1 };
 const NARROW_THRESHOLD = LAYOUT.narrowThreshold;

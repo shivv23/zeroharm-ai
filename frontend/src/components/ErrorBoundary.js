@@ -20,7 +20,7 @@ export default class ErrorBoundary extends React.Component {
       return (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          height: '100vh', background: COLORS.bgModal, color: COLORS.text, fontFamily: 'sans-serif', padding: 20, textAlign: 'center'
+          height: '100%', minHeight: 300, background: COLORS.bgModal, color: COLORS.text, fontFamily: 'sans-serif', padding: 20, textAlign: 'center'
         }}>
           <h1 style={{ fontSize: 24, marginBottom: 12 }}>Something went wrong</h1>
           <p style={{ color: COLORS.textSecondary, marginBottom: 20 }}>
