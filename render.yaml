@@ -14,6 +14,14 @@ services:
         value: 2
       - key: RISK_TREND_MAX
         value: 60
+      - key: JWT_SECRET
+        generateValue: true
+      - key: API_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite:///data/zeroharm.db
+      - key: JWT_EXPIRY_HOURS
+        value: 24
 
 static_sites:
   - name: zero-harmer-frontend

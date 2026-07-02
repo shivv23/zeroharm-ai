@@ -6,13 +6,11 @@ import random
 from config_loader import get_zones, get_scenarios
 import constants as C
 
-_zones_dict = {z["id"]: z["name"] for z in get_zones()}
-
-
 class WhatIfSimulator:
     def __init__(self):
         self.name = C.AGENT_WHAT_IF
         self.scenarios = get_scenarios()
+        self._zones_dict = {z["id"]: z["name"] for z in get_zones()}
         self.active_scenario = None
         self.custom_scenarios = []
         self._default_threshold = C.SENSOR_DEFAULT_THRESHOLD
@@ -44,7 +42,7 @@ class WhatIfSimulator:
             "id": f"PTW-SCEN-{scenario_id[:4].upper()}-{random.randint(lo, hi)}",
             "type": pinfo.get("type", C.DEFAULT_PERMIT_TYPE),
             "zone_id": pinfo.get("zone_id", self._default_zone),
-            "zone_name": _zones_dict.get(pinfo.get("zone_id", ""), ""),
+            "zone_name": self._zones_dict.get(pinfo.get("zone_id", ""), ""),
             "description": f"{pinfo.get('type', 'Work')} ({scenario_name})",
             "status": "active",
             "risk_level": pinfo.get("risk_level", "High"),
@@ -91,7 +89,7 @@ class WhatIfSimulator:
                 "id": f"PTW-CUSTOM-{random.randint(clo, chi)}",
                 "type": pinfo.get("type", C.DEFAULT_PERMIT_TYPE),
                 "zone_id": pinfo.get("zone_id", self._default_zone),
-                "zone_name": _zones_dict.get(pinfo.get("zone_id", ""), ""),
+                "zone_name": self._zones_dict.get(pinfo.get("zone_id", ""), ""),
                 "description": f"{pinfo.get('type', 'Work')} (Custom Scenario)",
                 "status": "active",
                 "risk_level": pinfo.get("risk_level", "High"),

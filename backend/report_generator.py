@@ -18,7 +18,6 @@ from reportlab.lib import colors
 
 from config_loader import get_agent_settings
 
-_REPORT_CFG = get_agent_settings().get("report_generation", {})
 
 DARK_BG = HexColor("#080c16")
 ACCENT = HexColor("#00e5ff")
@@ -60,7 +59,7 @@ class _NumberedCanvas:
 class ReportGenerator:
     def __init__(self):
         self._styles = _build_styles()
-        self._cfg = _REPORT_CFG
+        self._cfg = get_agent_settings().get("report_generation", {})
 
     def generate_compliance_report(self, compliance_data: Dict, plant_name: str, timestamp: str) -> bytes:
         buf = BytesIO()
@@ -224,7 +223,7 @@ def _footer_drawer(canvas, doc):
     canvas.setFillColor(TEXT_SECONDARY)
     text = f"Page {canvas.getPageNumber()}"
     canvas.drawRightString(_page_width - _margin, 12 * mm, text)
-    canvas.drawString(_margin, 12 * mm, _REPORT_CFG.get("confidentiality_label", "CONFIDENTIAL"))
+    canvas.drawString(_margin, 12 * mm, "CONFIDENTIAL")
     canvas.restoreState()
 
 

@@ -9,7 +9,7 @@ export default function GeospatialHeatmap({ zones, zoneRisks, selectedZone, onSe
   const permits = plantState?.active_permits || [];
 
   const sensorPositions = useMemo(() => {
-    return zones.flatMap(zone => {
+    return (zones || []).flatMap(zone => {
       const zoneSensors = sensors.filter(s => s.zone_id === zone.id);
       return zoneSensors.map((s, i) => {
         const col = i % 3;

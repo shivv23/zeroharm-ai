@@ -4,12 +4,10 @@ from datetime import datetime
 from config_loader import get_incident_records, get_zones, get_agent_settings
 import constants as C
 
-_ips = get_agent_settings()["incident_patterns"]
-
-
 class IncidentPatternIntelligence:
     def __init__(self):
         self.incidents = get_incident_records()
+        self._ips = get_agent_settings().get("incident_patterns", {})
         self.patterns = self._discover_patterns()
         self._zone_name_map = {z["id"]: z["name"] for z in get_zones()}
 
@@ -29,8 +27,8 @@ class IncidentPatternIntelligence:
 
         for zone, incidents in zone_incidents.items():
             if len(incidents) >= 2:
-                max_severity = max(_ips["severity_order"].get(i["severity"], 0) for i in incidents)
-                severity_label = _ips["severity_labels"].get(str(max_severity), C.SEVERITY_INFO)
+                max_severity = max(self._ips["severity_order"].get(i["severity"], 0) for i in incidents)
+                severity_label = self._ips["severity_labels"].get(str(max_severity), C.SEVERITY_INFO)
                 patterns.append({
                     "type": "RECURRING_ZONE", "zone": zone,
                     "incident_count": len(incidents), "incidents": [i["id"] for i in incidents],
@@ -39,7 +37,7 @@ class IncidentPatternIntelligence:
                     "recommendation": f"Zone-specific safety review recommended for {zone}. Review controls, increase monitoring frequency.",
                 })
 
-        for cause, incidents in sorted(cause_incidents.items(), key=lambda x: len(x[1]), reverse=True)[:_ips["top_causes_limit"]]:
+        for cause, incidents in sorted(cause_incidents.items(), key=lambda x: len(x[1]), reverse=True)[:self._ips["top_causes_limit"]]:
             if len(incidents) >= 2:
                 patterns.append({
                     "type": "RECURRING_CAUSE", "cause": cause,
@@ -60,7 +58,7 @@ class IncidentPatternIntelligence:
                     "recommendation": f"Review {inc_type.replace('_', ' ')} controls for {zone}. Consider additional engineering controls.",
                 })
 
-        patterns.sort(key=lambda x: _ips["pattern_sort_order"].get(x["severity"], 5))
+        patterns.sort(key=lambda x: self._ips["pattern_sort_order"].get(x["severity"], 5))
         return patterns
 
     def get_all_patterns(self) -> List[Dict]:
@@ -81,7 +79,7 @@ class IncidentPatternIntelligence:
         for p in self.patterns:
             if p.get("zone") == zone_name and p.get("recommendation"):
                 recommendations.append(p["recommendation"])
-        return list(set(recommendations))[:_ips["max_prevention_recs"]]
+        return list(set(recommendations))[:self._ips["max_prevention_recs"]]
 
     def get_statistics(self) -> Dict:
         type_counts = {}
@@ -105,4 +103,4 @@ class IncidentPatternIntelligence:
             for factor in inc["contributing_factors"]:
                 factor_counts[factor] = factor_counts.get(factor, 0) + 1
         sorted_factors = sorted(factor_counts.items(), key=lambda x: x[1], reverse=True)
-        return [{"factor": f, "count": c} for f, c in sorted_factors[:_ips["top_causes_limit"]]]
+        return [{"factor": f, "count": c} for f, c in sorted_factors[:self._ips["top_causes_limit"]]]
