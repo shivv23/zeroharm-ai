@@ -47,6 +47,10 @@ from anomaly_detector import SensorAnomalyDetector
 from shift_handover import generate_shift_handover
 from chat_assistant import ChatAssistant
 from cost_of_safety import compute_cost_of_safety
+from root_cause_analyzer import RootCauseAnalyzer
+from digital_twin import DigitalTwinAggregator
+from personnel_tracker import PersonnelTracker
+import regulatory_reporter
 from database import init_db, save_plant_state, save_sensor_reading, save_permit, save_compliance_audit, save_alert, get_recent_plant_states
 from alert_dispatcher import AlertDispatcher
 try:
@@ -109,6 +113,9 @@ class ZeroHarmAPI:
         self.predictor = PredictiveRiskForecaster()
         self.anomaly_detector = SensorAnomalyDetector()
         self.chat = ChatAssistant()
+        self.root_cause = RootCauseAnalyzer()
+        self.digital_twin = DigitalTwinAggregator()
+        self.personnel = PersonnelTracker()
         self.vision = VisionIntegration() if _vision_available else None
         if self.vision and C.VISION_ENABLED:
             self.vision.load_model()
@@ -849,6 +856,73 @@ async def chat_assistant(req: ChatRequest):
         alerts=api._last_risk_result.get("alerts", []) if api._last_risk_result else [],
     )
     return flagged_response(result)
+
+
+@app.get("/api/digital-twin", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_digital_twin():
+    dashboard = api.digital_twin.build_dashboard(
+        plant_state=api._plant_snapshot,
+        risk_result=api._last_risk_result,
+        compliance_result=api._last_compliance_result,
+        health_index=api._last_health_index,
+        risk_trend=api.risk_trend,
+        alerts=api._last_risk_result.get("alerts", []) if api._last_risk_result else [],
+        activity_feed=api.activity_feed,
+    )
+    return flagged_response(dashboard)
+
+
+@app.get("/api/incident/root-cause", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_root_cause(incident_id: str = None, incident_type: str = None):
+    if not api._plant_snapshot:
+        api.plant_state = api.generator.step()
+        api._plant_snapshot = api.plant_state.copy()
+    result = api.root_cause.analyze(
+        incident_id=incident_id,
+        incident_type=incident_type,
+        plant_state=api._plant_snapshot,
+    )
+    return flagged_response(result)
+
+
+@app.get("/api/personnel/locations", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_personnel_locations():
+    return flagged_response({"personnel": api.personnel.get_all_locations()})
+
+
+@app.get("/api/personnel/occupancy", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_zone_occupancy():
+    return flagged_response({"zones": api.personnel.get_zone_occupancy()})
+
+
+@app.get("/api/personnel/mustering", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
+async def get_mustering_status(emergency_zone: str = None):
+    return flagged_response(api.personnel.get_mustering_status(emergency_zone))
+
+
+@app.post("/api/personnel/mustering/trigger", dependencies=[Depends(require_permission("write")), Depends(verify_api_key), Depends(rate_limit)])
+async def trigger_mustering(emergency_zone: str = "Z01"):
+    return flagged_response(api.personnel.trigger_mustering(emergency_zone))
+
+
+@app.get("/api/personnel/hazard-exposure", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_hazard_exposure():
+    return flagged_response(api.personnel.get_hazard_exposure_report())
+
+
+@app.get("/api/reports/regulatory/{standard}", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_regulatory_report(standard: str):
+    standards_map = {
+        "oisd": regulatory_reporter.generate_oisd_report,
+        "factory-act": regulatory_reporter.generate_factory_act_report,
+        "iso45001": regulatory_reporter.generate_iso45001_report,
+    }
+    if standard not in standards_map:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=f"Unknown standard: {standard}. Use: oisd, factory-act, iso45001")
+    pdf_bytes = standards_map[standard]()
+    return StreamingResponse(BytesIO(pdf_bytes), media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=compliance_{standard}.pdf"})
 
 
 @app.get("/api/reports/shift-handover", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])

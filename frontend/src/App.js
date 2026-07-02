@@ -23,6 +23,10 @@ const AnomalyPanel = lazy(() => import('./components/AnomalyPanel'));
 const IsometricPlantView = lazy(() => import('./components/IsometricPlantView'));
 const CostOfSafetyDashboard = lazy(() => import('./components/CostOfSafetyDashboard'));
 const ChatWidget = lazy(() => import('./components/ChatWidget'));
+const RootCauseAnalysis = lazy(() => import('./components/RootCauseAnalysis'));
+const DigitalTwinDashboard = lazy(() => import('./components/DigitalTwinDashboard'));
+const RegulatoryReporter = lazy(() => import('./components/RegulatoryReporter'));
+const PersonnelTracker = lazy(() => import('./components/PersonnelTracker'));
 
 import { APP_TABS as TABS, COLORS, LAYOUT, ALERT_AUDIO, TOAST_DURATION } from './store/theme';
 
@@ -212,6 +216,14 @@ export default function App() {
             selectedZone={selectedZone} onSelectZone={setSelectedZone} />;
         case 'cost':
           return <CostOfSafetyDashboard />;
+        case 'rootcause':
+          return <RootCauseAnalysis />;
+        case 'twindash':
+          return <DigitalTwinDashboard />;
+        case 'reports':
+          return <RegulatoryReporter />;
+        case 'personnel':
+          return <PersonnelTracker />;
         default:
           return null;
       }

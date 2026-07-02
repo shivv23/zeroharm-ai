@@ -222,6 +222,10 @@ export const APP_TABS = [
   { id: 'investigations', label: 'Investigations', icon: '\u{1F50D}' },
   { id: '3dview', label: '3D Plant', icon: '\u{1F30D}' },
   { id: 'cost', label: 'Cost of Safety', icon: '\u{1F4B0}' },
+  { id: 'rootcause', label: 'Root Cause', icon: '\u{1F50D}' },
+  { id: 'twindash', label: 'Plant Pulse', icon: '\u{1F4CA}' },
+  { id: 'reports', label: 'Reports', icon: '\u{1F4DD}' },
+  { id: 'personnel', label: 'Personnel', icon: '\u{1F465}' },
 ];
 
 // -------- Alert Duration Defaults --------
