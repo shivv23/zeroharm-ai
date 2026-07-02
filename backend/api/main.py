@@ -42,6 +42,9 @@ from orchestrator.incident_pattern_intelligence import IncidentPatternIntelligen
 from orchestrator.what_if_simulator import WhatIfSimulator
 from orchestrator.incident_investigation import IncidentInvestigation
 from report_generator import ReportGenerator
+from predictive_risk import PredictiveRiskForecaster
+from anomaly_detector import SensorAnomalyDetector
+from shift_handover import generate_shift_handover
 from database import init_db, save_plant_state, save_sensor_reading, save_permit, save_compliance_audit, save_alert, get_recent_plant_states
 from alert_dispatcher import AlertDispatcher
 try:
@@ -101,6 +104,8 @@ class ZeroHarmAPI:
         self.incident_investigation = IncidentInvestigation()
         self.report_generator = ReportGenerator()
         self.alert_dispatcher = AlertDispatcher()
+        self.predictor = PredictiveRiskForecaster()
+        self.anomaly_detector = SensorAnomalyDetector()
         self.vision = VisionIntegration() if _vision_available else None
         if self.vision and C.VISION_ENABLED:
             self.vision.load_model()
@@ -153,6 +158,9 @@ class ZeroHarmAPI:
                     await save_permit(p)
                 risk_result = await self.risk_engine.run_async(copy.deepcopy(self._plant_snapshot))
                 self._last_risk_result = risk_result
+                self.predictor.feed(risk_result.get("risk_score", 0))
+                for sid, s in self._plant_snapshot.get("sensors", {}).items():
+                    self.anomaly_detector.feed_sensor(sid, s.get("value", 0))
                 self.risk_trend.append({
                     "timestamp": datetime.now().isoformat(),
                     "score": risk_result.get("risk_score", 0),
@@ -784,6 +792,65 @@ async def get_health_index():
     risk = await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
     compliance = await asyncio.to_thread(api.compliance_agent.run_audit, copy.deepcopy(api._plant_snapshot))
     return flagged_response(await api._compute_health_index(api._plant_snapshot, risk, compliance))
+
+
+@app.get("/api/predictive-risk", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_predictive_risk():
+    return flagged_response(api.predictor.forecast(steps=5))
+
+
+@app.get("/api/anomalies", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_anomalies():
+    if not api._plant_snapshot:
+        return flagged_response([])
+    results = api.anomaly_detector.scan_all(api._plant_snapshot.get("sensors", {}))
+    return flagged_response(results)
+
+
+@app.get("/api/safety-scores", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_safety_scores():
+    if not api._plant_snapshot:
+        return flagged_response({"zones": [], "plant_average": 0})
+    zone_scores = api._plant_snapshot.get("zone_risk_scores", {})
+    zones = []
+    from config_loader import get_zones
+    all_zones = get_zones()
+    for z in all_zones:
+        zid = z["id"]
+        base = zone_scores.get(zid, z.get("baseRisk", 0.5))
+        score = max(0, min(100, round((1 - base) * 100, 1)))
+        zones.append({"zone_id": zid, "name": z["name"], "safety_score": score, "hazard": z.get("hazard_class", "High")})
+    zones.sort(key=lambda x: x["safety_score"])
+    avg = round(sum(z["safety_score"] for z in zones) / len(zones), 1) if zones else 0
+    return flagged_response({"zones": zones, "plant_average": avg, "total_zones": len(zones)})
+
+
+@app.get("/api/reports/shift-handover", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_shift_handover(shift: str = "Night"):
+    if not api._plant_snapshot:
+        api.plant_state = api.generator.step()
+        api._plant_snapshot = copy.deepcopy(api.plant_state)
+    alerts = api._last_risk_result.get("alerts", []) if api._last_risk_result else []
+    permits = api._plant_snapshot.get("active_permits", [])
+    incidents = []
+    try:
+        from database import get_incident_history
+        incidents = await get_incident_history(limit=20)
+    except Exception:
+        pass
+    pdf_bytes = generate_shift_handover(
+        plant_name=C.PLANT_NAME,
+        shift_label=shift,
+        alerts=alerts,
+        permits=permits,
+        risk_trend=api.risk_trend,
+        incidents=incidents,
+        compliance_score=api._last_compliance_result.get(C.OVERALL_COMPLIANCE_SCORE_KEY) if api._last_compliance_result else None,
+        health_index=api._last_health_index,
+        zone_risk_scores=api._plant_snapshot.get("zone_risk_scores"),
+    )
+    return StreamingResponse(BytesIO(pdf_bytes), media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=shift_handover_{shift.lower()}.pdf"})
 
 
 @app.get("/api/reports/compliance", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])

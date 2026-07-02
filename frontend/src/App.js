@@ -17,6 +17,9 @@ const ActivityFeed = lazy(() => import('./components/ActivityFeed'));
 const RiskTrendChart = lazy(() => import('./components/RiskTrendChart'));
 const WhatIfSimulator = lazy(() => import('./components/WhatIfSimulator'));
 const CompliancePanel = lazy(() => import('./components/CompliancePanel'));
+const SafetyGamification = lazy(() => import('./components/SafetyGamification'));
+const PredictiveRiskPanel = lazy(() => import('./components/PredictiveRiskPanel'));
+const AnomalyPanel = lazy(() => import('./components/AnomalyPanel'));
 
 import { APP_TABS as TABS, COLORS, LAYOUT, ALERT_AUDIO, TOAST_DURATION } from './store/theme';
 
@@ -195,6 +198,12 @@ export default function App() {
           return <IncidentPatterns />;
         case 'investigations':
           return <IncidentInvestigation />;
+        case 'safety':
+          return <SafetyGamification />;
+        case 'forecast':
+          return <PredictiveRiskPanel riskTrend={riskTrend} />;
+        case 'anomalies':
+          return <AnomalyPanel />;
         default:
           return null;
       }

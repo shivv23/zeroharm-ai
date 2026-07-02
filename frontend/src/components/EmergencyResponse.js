@@ -2,6 +2,17 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ws from '../store/websocketStore';
 import { EMERGENCY_TYPES, COLORS } from '../store/theme';
 
+function speak(text) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    window.speechSynthesis.speak(utterance);
+  }
+}
+
 export default function EmergencyResponse({ triggerEmergency = () => {}, resolveEmergency = () => {}, showModal, setShowModal = () => {}, plantState = null }) {
   const [selectedType, setSelectedType] = useState('gas_leak');
   const [activeEmergencies, setActiveEmergencies] = useState([]);
@@ -15,11 +26,13 @@ export default function EmergencyResponse({ triggerEmergency = () => {}, resolve
     const unsub = ws.on('emergency_triggered', (d) => {
       setActiveEmergencies(prev => [...prev, d.data]);
       addLog(`EMERGENCY TRIGGERED: ${d.data.label} in ${d.data.zone_name}`);
+      speak(`Emergency: ${d.data.label} in ${d.data.zone_name}. Evacuate area immediately.`);
     });
     const unsub2 = ws.on('emergency_resolved', (d) => {
       if (d.data) {
         setActiveEmergencies(prev => prev.filter(e => e.id !== d.data.id));
         addLog(`EMERGENCY RESOLVED: ${d.data.id}`);
+        speak(`All clear. Emergency ${d.data.id} has been resolved.`);
       }
     });
     return () => { unsub(); unsub2(); };
@@ -36,6 +49,7 @@ export default function EmergencyResponse({ triggerEmergency = () => {}, resolve
     };
     triggerEmergency(selectedType, context);
     addLog(`Triggering ${selectedType} in ${context.zone_name}...`);
+    speak(`Warning: ${selectedType.replace(/_/g, ' ')} reported in ${context.zone_name}. Take immediate action.`);
   };
 
   const handleResolve = (id) => {
