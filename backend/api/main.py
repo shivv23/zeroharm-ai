@@ -45,6 +45,8 @@ from report_generator import ReportGenerator
 from predictive_risk import PredictiveRiskForecaster
 from anomaly_detector import SensorAnomalyDetector
 from shift_handover import generate_shift_handover
+from chat_assistant import ChatAssistant
+from cost_of_safety import compute_cost_of_safety
 from database import init_db, save_plant_state, save_sensor_reading, save_permit, save_compliance_audit, save_alert, get_recent_plant_states
 from alert_dispatcher import AlertDispatcher
 try:
@@ -106,6 +108,7 @@ class ZeroHarmAPI:
         self.alert_dispatcher = AlertDispatcher()
         self.predictor = PredictiveRiskForecaster()
         self.anomaly_detector = SensorAnomalyDetector()
+        self.chat = ChatAssistant()
         self.vision = VisionIntegration() if _vision_available else None
         if self.vision and C.VISION_ENABLED:
             self.vision.load_model()
@@ -823,6 +826,29 @@ async def get_safety_scores():
     zones.sort(key=lambda x: x["safety_score"])
     avg = round(sum(z["safety_score"] for z in zones) / len(zones), 1) if zones else 0
     return flagged_response({"zones": zones, "plant_average": avg, "total_zones": len(zones)})
+
+
+@app.get("/api/cost-of-safety", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_cost_of_safety():
+    alerts = api._last_risk_result.get("alerts", []) if api._last_risk_result else []
+    permits = api._plant_snapshot.get("active_permits", []) if api._plant_snapshot else []
+    return flagged_response(compute_cost_of_safety(alerts=alerts, active_permits=permits))
+
+
+from api.schemas import ChatRequest
+
+@app.post("/api/chat", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def chat_assistant(req: ChatRequest):
+    result = await api.chat.answer(
+        message=req.message,
+        plant_state=api._plant_snapshot,
+        risk_result=api._last_risk_result,
+        compliance_result=api._last_compliance_result,
+        health_index=api._last_health_index,
+        risk_trend=api.risk_trend,
+        alerts=api._last_risk_result.get("alerts", []) if api._last_risk_result else [],
+    )
+    return flagged_response(result)
 
 
 @app.get("/api/reports/shift-handover", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])

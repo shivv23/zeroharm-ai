@@ -5,10 +5,9 @@ from config_loader import get_rag_documents, get_safety_practices, get_agent_set
 from rag.semantic_search import SemanticSearchPipeline
 import constants as C
 
-_rp = get_agent_settings()["rag_pipeline"]
-
 class RAGPipeline:
     def __init__(self):
+        self._rp = get_agent_settings().get("rag_pipeline", {})
         self.documents = get_rag_documents()
         self.best_practices = get_safety_practices()
         self.vector_store = {}
@@ -16,7 +15,7 @@ class RAGPipeline:
 
     def search(self, query: str, top_k: int = None) -> List[Dict]:
         if top_k is None:
-            top_k = _rp["default_top_k"]
+            top_k = self._rp.get("default_top_k", C.DEFAULT_TOP_K)
         return self.semantic.search(query, top_k=top_k)
 
     def query_permit_compliance(self, permit_type: str, zone_hazard_class: str,

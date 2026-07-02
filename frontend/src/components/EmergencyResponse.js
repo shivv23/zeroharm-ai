@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ws from '../store/websocketStore';
 import { EMERGENCY_TYPES, COLORS } from '../store/theme';
+import GasDispersionOverlay from './GasDispersionOverlay';
 
 function speak(text) {
   if ('speechSynthesis' in window) {
@@ -179,6 +180,14 @@ export default function EmergencyResponse({ triggerEmergency = () => {}, resolve
               </div>
             ))}
           </div>
+
+          {/* Gas Dispersion Overlay */}
+          {activeEmergencies.some(e => e.type === 'gas_leak' || e.type === 'explosion') && (
+            <div style={{ position: 'relative', height: 200, background: '#080c16', borderRadius: 6, border: '1px solid #1f2937', overflow: 'hidden' }}>
+              <GasDispersionOverlay emergency={activeEmergencies.find(e => e.type === 'gas_leak' || e.type === 'explosion')}
+                zoneRisks={{}} plantState={plantState} />
+            </div>
+          )}
 
           {/* Log */}
           <div style={{ maxHeight: 100, overflow: 'auto', background: COLORS.bgElevated, borderRadius: 6, padding: 8, border: '1px solid ' + COLORS.border }}>

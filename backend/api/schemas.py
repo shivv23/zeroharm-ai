@@ -129,3 +129,7 @@ class VisionStatusResponse(BaseModel):
     opencv_available: bool = False
     active_streams: List[str] = []
     model_path: str = ""
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=500)

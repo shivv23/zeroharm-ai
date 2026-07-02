@@ -220,6 +220,8 @@ export const APP_TABS = [
   { id: 'feed', label: 'Agents', icon: '\u{1F916}' },
   { id: 'patterns', label: 'Patterns', icon: '\u{1F50D}' },
   { id: 'investigations', label: 'Investigations', icon: '\u{1F50D}' },
+  { id: '3dview', label: '3D Plant', icon: '\u{1F30D}' },
+  { id: 'cost', label: 'Cost of Safety', icon: '\u{1F4B0}' },
 ];
 
 // -------- Alert Duration Defaults --------

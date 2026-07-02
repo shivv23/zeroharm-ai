@@ -51,6 +51,9 @@ check "Incident history" GET "$API/incident/history" 200
 check "Health index" GET "$API/health-index" 200
 check "Investigation list" GET "$API/investigation/list" 200
 check "Scenarios" GET "$API/scenarios" 200
+check "Cost of Safety" GET "$API/cost-of-safety" 200
+check "Chat assistant" POST "$API/chat" 200 "-d '{\"message\":\"what is the risk\"}'"
+check "Shift handover" GET "$API/reports/shift-handover?shift=Day" 200
 
 echo "============================================"
 echo "  Results: $PASS passed, $FAIL failed"

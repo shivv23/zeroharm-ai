@@ -20,6 +20,9 @@ const CompliancePanel = lazy(() => import('./components/CompliancePanel'));
 const SafetyGamification = lazy(() => import('./components/SafetyGamification'));
 const PredictiveRiskPanel = lazy(() => import('./components/PredictiveRiskPanel'));
 const AnomalyPanel = lazy(() => import('./components/AnomalyPanel'));
+const IsometricPlantView = lazy(() => import('./components/IsometricPlantView'));
+const CostOfSafetyDashboard = lazy(() => import('./components/CostOfSafetyDashboard'));
+const ChatWidget = lazy(() => import('./components/ChatWidget'));
 
 import { APP_TABS as TABS, COLORS, LAYOUT, ALERT_AUDIO, TOAST_DURATION } from './store/theme';
 
@@ -204,6 +207,11 @@ export default function App() {
           return <PredictiveRiskPanel riskTrend={riskTrend} />;
         case 'anomalies':
           return <AnomalyPanel />;
+        case '3dview':
+          return <IsometricPlantView zones={PLANT_ZONES} zoneRisks={zoneRisks}
+            selectedZone={selectedZone} onSelectZone={setSelectedZone} />;
+        case 'cost':
+          return <CostOfSafetyDashboard />;
         default:
           return null;
       }
@@ -313,6 +321,10 @@ export default function App() {
           </Suspense>
         </div>
       </div>
+      <Suspense fallback={null}>
+        <ChatWidget plantState={plantState} riskResult={riskData} compliance={compliance}
+          healthIndex={healthIndex} riskTrend={riskTrend} alerts={alerts} />
+      </Suspense>
     </div>
   );
 }
