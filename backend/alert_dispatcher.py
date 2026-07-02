@@ -2,12 +2,31 @@ import json
 import logging
 import os
 import smtplib
+import time
 from datetime import datetime
 from email.message import EmailMessage
 from urllib.request import Request, urlopen
 from urllib.error import URLError
 
 logger = logging.getLogger("zeroharm-alert")
+
+
+def _retry(max_attempts=3, delay=1.0, backoff=2.0):
+    def decorator(fn):
+        def wrapper(*args, **kwargs):
+            last_exc = None
+            for attempt in range(max_attempts):
+                try:
+                    return fn(*args, **kwargs)
+                except Exception as e:
+                    last_exc = e
+                    if attempt < max_attempts - 1:
+                        sleep_time = delay * (backoff ** attempt)
+                        logger.warning(f"{fn.__name__} failed (attempt {attempt+1}/{max_attempts}): {e}, retrying in {sleep_time:.1f}s")
+                        time.sleep(sleep_time)
+            logger.error(f"{fn.__name__} failed after {max_attempts} attempts: {last_exc}")
+        return wrapper
+    return decorator
 
 SEVERITY_EMOJI = {
     "critical": ":rotating_light:",
@@ -87,6 +106,7 @@ class AlertDispatcher:
             f"Details: {msg}"
         )
 
+    @_retry(max_attempts=3, delay=1.0, backoff=2.0)
     def send_slack(self, webhook_url, message, severity):
         color = SEVERITY_COLOR.get(severity, "#808080")
         emoji = SEVERITY_EMOJI.get(severity, ":bell:")
@@ -105,6 +125,7 @@ class AlertDispatcher:
         except URLError as e:
             logger.error(f"Slack send failed: {e}")
 
+    @_retry(max_attempts=3, delay=1.0, backoff=2.0)
     def send_email(self, smtp_config, to, subject, body):
         msg = EmailMessage()
         msg["Subject"] = subject
@@ -119,6 +140,7 @@ class AlertDispatcher:
         except Exception as e:
             logger.error(f"Email send failed: {e}")
 
+    @_retry(max_attempts=3, delay=1.0, backoff=2.0)
     def send_sms(self, twilio_config, to, message):
         try:
             from twilio.rest import Client

@@ -17,6 +17,7 @@ class PlantStateModel(Base):
     timestamp = Column(DateTime, default=datetime.now)
     time_step = Column(Integer)
     plant_name = Column(String(255))
+    tenant_id = Column(String(100), default="plant_1")
     state_data = Column(Text)
 
 
@@ -33,6 +34,7 @@ class SensorReadingModel(Base):
     critical = Column(Float)
     status = Column(String(50))
     risk_score = Column(Float)
+    tenant_id = Column(String(100), default="plant_1")
     timestamp = Column(DateTime, default=datetime.now)
 
 
@@ -49,6 +51,7 @@ class PermitModel(Base):
     workers = Column(Text)
     risk_level = Column(String(50))
     conditions_check = Column(Boolean)
+    tenant_id = Column(String(100), default="plant_1")
     timestamp = Column(DateTime, default=datetime.now)
 
 
@@ -61,6 +64,7 @@ class IncidentModel(Base):
     zone_name = Column(String(255))
     triggered_at = Column(DateTime)
     resolved_at = Column(DateTime, nullable=True)
+    tenant_id = Column(String(100), default="plant_1")
     details = Column(Text)
     timestamp = Column(DateTime, default=datetime.now)
 
@@ -73,6 +77,7 @@ class ComplianceAuditModel(Base):
     severity = Column(String(50))
     violations_count = Column(Integer)
     critical_findings_count = Column(Integer)
+    tenant_id = Column(String(100), default="plant_1")
     details = Column(Text)
     timestamp = Column(DateTime, default=datetime.now)
 
@@ -86,6 +91,7 @@ class AlertModel(Base):
     message = Column(Text)
     zone_id = Column(String(50), nullable=True)
     zone_name = Column(String(255), nullable=True)
+    tenant_id = Column(String(100), default="plant_1")
     timestamp = Column(DateTime, default=datetime.now)
 
 
@@ -95,6 +101,16 @@ class EmergencyEventModel(Base):
     emergency_id = Column(String(100))
     event_type = Column(String(100))
     event_data = Column(Text)
+    timestamp = Column(DateTime, default=datetime.now)
+
+
+class ScenarioStateModel(Base):
+    __tablename__ = "scenario_states"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    scenario_id = Column(String(100))
+    scenario_name = Column(String(255))
+    state_data = Column(Text)
+    is_active = Column(Boolean, default=False)
     timestamp = Column(DateTime, default=datetime.now)
 
 
@@ -274,6 +290,52 @@ async def save_emergency_event(event: Dict[str, Any]) -> None:
                 timestamp=datetime.now(),
             )
             session.add(model)
+
+
+async def save_scenario_state(scenario_id: str, scenario_name: str, state: Dict[str, Any], is_active: bool = False) -> None:
+    global _async_session_maker
+    if _async_session_maker is None:
+        await init_db()
+    async with _async_session_maker() as session:
+        async with session.begin():
+            from sqlalchemy import select, update
+            if is_active:
+                await session.execute(
+                    update(ScenarioStateModel).where(ScenarioStateModel.is_active == True).values(is_active=False)
+                )
+            existing = await session.execute(
+                select(ScenarioStateModel).where(
+                    ScenarioStateModel.scenario_id == scenario_id,
+                    ScenarioStateModel.is_active == True
+                )
+            )
+            row = existing.scalar_one_or_none()
+            if row:
+                row.state_data = json.dumps(state, default=str)
+                row.timestamp = datetime.now()
+            else:
+                session.add(ScenarioStateModel(
+                    scenario_id=scenario_id,
+                    scenario_name=scenario_name,
+                    state_data=json.dumps(state, default=str),
+                    is_active=is_active,
+                    timestamp=datetime.now(),
+                ))
+
+
+async def get_active_scenario_state() -> Optional[Dict[str, Any]]:
+    global _async_session_maker
+    if _async_session_maker is None:
+        return None
+    async with _async_session_maker() as session:
+        from sqlalchemy import select
+        result = await session.execute(
+            select(ScenarioStateModel).where(ScenarioStateModel.is_active == True).order_by(ScenarioStateModel.timestamp.desc()).limit(1)
+        )
+        row = result.scalar_one_or_none()
+        if not row:
+            return None
+        return json.loads(row.state_data) if row.state_data else None
 
 
 async def get_recent_plant_states(limit: int = 10) -> List[Dict[str, Any]]:

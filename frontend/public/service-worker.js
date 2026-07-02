@@ -79,12 +79,22 @@ async function networkFirst(request) {
     if (response.ok) {
       const cache = await caches.open(API_CACHE);
       cache.put(request, response.clone());
+      trimCache(API_CACHE, 50);
     }
     return response;
   } catch (e) {
     const cached = await caches.match(request);
     if (cached) return cached;
     return caches.match(OFFLINE_URL);
+  }
+}
+
+async function trimCache(cacheName, maxItems) {
+  const cache = await caches.open(cacheName);
+  const keys = await cache.keys();
+  if (keys.length > maxItems) {
+    const toDelete = keys.slice(0, keys.length - maxItems);
+    await Promise.all(toDelete.map(key => cache.delete(key)));
   }
 }
 

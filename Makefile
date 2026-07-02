@@ -7,9 +7,12 @@ run-frontend:
 	cd frontend && npm start
 
 test:
-	cd backend && python ../scripts/test_agents.py
+	cd backend && python -m pytest tests/ -v
 
 test-backend:
+	cd backend && python -m pytest tests/ -v
+
+test-legacy:
 	cd backend && python ../scripts/test_agents.py
 
 clean:
