@@ -226,6 +226,10 @@ export const APP_TABS = [
   { id: 'twindash', label: 'Plant Pulse', icon: '\u{1F4CA}' },
   { id: 'reports', label: 'Reports', icon: '\u{1F4DD}' },
   { id: 'personnel', label: 'Personnel', icon: '\u{1F465}' },
+  { id: 'triage', label: 'Alert Triage', icon: '\u{1F9D0}' },
+  { id: 'eqhealth', label: 'Equip Health', icon: '\u{1F527}' },
+  { id: 'observations', label: 'Observations', icon: '\u{1F4A1}' },
+  { id: 'environmental', label: 'Environment', icon: '\u{1F30D}' },
 ];
 
 // -------- Alert Duration Defaults --------

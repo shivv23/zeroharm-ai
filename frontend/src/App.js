@@ -27,6 +27,10 @@ const RootCauseAnalysis = lazy(() => import('./components/RootCauseAnalysis'));
 const DigitalTwinDashboard = lazy(() => import('./components/DigitalTwinDashboard'));
 const RegulatoryReporter = lazy(() => import('./components/RegulatoryReporter'));
 const PersonnelTracker = lazy(() => import('./components/PersonnelTracker'));
+const AlertTriagePanel = lazy(() => import('./components/AlertTriagePanel'));
+const EquipmentHealthDashboard = lazy(() => import('./components/EquipmentHealthDashboard'));
+const SafetyObservations = lazy(() => import('./components/SafetyObservations'));
+const EnvironmentalDashboard = lazy(() => import('./components/EnvironmentalDashboard'));
 
 import { APP_TABS as TABS, COLORS, LAYOUT, ALERT_AUDIO, TOAST_DURATION } from './store/theme';
 
@@ -224,6 +228,14 @@ export default function App() {
           return <RegulatoryReporter />;
         case 'personnel':
           return <PersonnelTracker />;
+        case 'triage':
+          return <AlertTriagePanel alerts={alerts} />;
+        case 'eqhealth':
+          return <EquipmentHealthDashboard />;
+        case 'observations':
+          return <SafetyObservations />;
+        case 'environmental':
+          return <EnvironmentalDashboard />;
         default:
           return null;
       }

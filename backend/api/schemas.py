@@ -133,3 +133,19 @@ class VisionStatusResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=500)
+
+
+class ObservationSubmitRequest(BaseModel):
+    observation_type: str = Field(..., min_length=1, max_length=50)
+    zone_id: str = Field(..., min_length=1, max_length=50)
+    description: str = Field(..., min_length=1, max_length=1000)
+    severity: str = "medium"
+    submitted_by: str = "Anonymous"
+    location_detail: str = ""
+
+
+class ObservationReviewRequest(BaseModel):
+    obs_id: str = Field(..., min_length=1)
+    reviewer: str = Field(..., min_length=1)
+    resolution: str = Field(..., min_length=1)
+    status: str = "closed"

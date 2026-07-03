@@ -51,6 +51,10 @@ from root_cause_analyzer import RootCauseAnalyzer
 from digital_twin import DigitalTwinAggregator
 from personnel_tracker import PersonnelTracker
 import regulatory_reporter
+from alert_triage import AlertTriageEngine
+from equipment_health import EquipmentHealthMonitor
+from safety_observations import SafetyObservationSystem
+from environmental_monitor import EnvironmentalMonitor
 from database import init_db, save_plant_state, save_sensor_reading, save_permit, save_compliance_audit, save_alert, get_recent_plant_states
 from alert_dispatcher import AlertDispatcher
 try:
@@ -116,6 +120,10 @@ class ZeroHarmAPI:
         self.root_cause = RootCauseAnalyzer()
         self.digital_twin = DigitalTwinAggregator()
         self.personnel = PersonnelTracker()
+        self.alert_triage = AlertTriageEngine()
+        self.equipment_health = EquipmentHealthMonitor()
+        self.safety_obs = SafetyObservationSystem()
+        self.environmental = EnvironmentalMonitor()
         self.vision = VisionIntegration() if _vision_available else None
         if self.vision and C.VISION_ENABLED:
             self.vision.load_model()
@@ -908,6 +916,82 @@ async def trigger_mustering(emergency_zone: str = "Z01"):
 @app.get("/api/personnel/hazard-exposure", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_hazard_exposure():
     return flagged_response(api.personnel.get_hazard_exposure_report())
+
+
+@app.post("/api/alerts/triage", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def triage_alert(alert_id: str = None, severity: str = "warning", zone: str = "plant"):
+    alert = {"id": alert_id, "severity": severity, "zone": zone}
+    result = api.alert_triage.triage(alert, plant_state=api._plant_snapshot)
+    return flagged_response(result)
+
+
+@app.get("/api/alerts/triage-stats", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def triage_stats():
+    alerts = api._last_risk_result.get("alerts", []) if api._last_risk_result else []
+    return flagged_response(api.alert_triage.get_stats(alerts))
+
+
+@app.get("/api/maintenance/equipment-health", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_equipment_health():
+    equipment = api.equipment_health.assess_equipment(plant_state=api._plant_snapshot)
+    summary = api.equipment_health.get_summary(equipment)
+    return flagged_response({"equipment": equipment, "summary": summary})
+
+
+@app.get("/api/safety/observations", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def list_observations(limit: int = 50):
+    return flagged_response({"observations": api.safety_obs.get_all(limit)})
+
+
+@app.get("/api/safety/observations/open", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def list_open_observations():
+    return flagged_response({"observations": api.safety_obs.get_open()})
+
+
+@app.get("/api/safety/observations/trends", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def observation_trends():
+    return flagged_response(api.safety_obs.get_trends())
+
+
+@app.get("/api/safety/observations/types", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def observation_types():
+    return flagged_response({"types": api.safety_obs.get_observation_types()})
+
+
+from api.schemas import ObservationSubmitRequest, ObservationReviewRequest
+
+@app.post("/api/safety/observations/submit", dependencies=[Depends(require_permission("write")), Depends(rate_limit)])
+async def submit_observation(req: ObservationSubmitRequest):
+    result = api.safety_obs.submit(
+        observation_type=req.observation_type, zone_id=req.zone_id,
+        description=req.description, severity=req.severity,
+        submitted_by=req.submitted_by, location_detail=req.location_detail,
+    )
+    return flagged_response(result)
+
+
+@app.post("/api/safety/observations/review", dependencies=[Depends(require_permission("write")), Depends(rate_limit)])
+async def review_observation(req: ObservationReviewRequest):
+    result = api.safety_obs.review(
+        obs_id=req.obs_id, reviewer=req.reviewer,
+        resolution=req.resolution, status=req.status,
+    )
+    return flagged_response(result or {"error": "Observation not found"})
+
+
+@app.get("/api/environmental/metrics", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_environmental_metrics():
+    return flagged_response(api.environmental.get_summary(sensors=api._plant_snapshot.get("sensors")))
+
+
+@app.get("/api/environmental/compliance", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_environmental_compliance():
+    return flagged_response(api.environmental.get_compliance(sensors=api._plant_snapshot.get("sensors")))
+
+
+@app.get("/api/environmental/history/{metric_id}", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
+async def get_environmental_history(metric_id: str, hours: int = 24):
+    return flagged_response({"metric": metric_id, "history": api.environmental.get_history(metric_id, hours)})
 
 
 @app.get("/api/reports/regulatory/{standard}", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])

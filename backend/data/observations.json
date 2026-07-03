@@ -1,0 +1,30 @@
+[
+  {
+    "id": "OBS-20260703-132643-1",
+    "type": "unsafe_condition",
+    "zone_id": "Z01",
+    "description": "Test 1",
+    "severity": "low",
+    "submitted_by": "Anonymous",
+    "location_detail": "",
+    "submitted_at": "2026-07-03T13:26:43.972125",
+    "status": "open",
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "resolution": null
+  },
+  {
+    "id": "OBS-20260703-132643-2",
+    "type": "unsafe_condition",
+    "zone_id": "Z01",
+    "description": "Test 2",
+    "severity": "critical",
+    "submitted_by": "Anonymous",
+    "location_detail": "",
+    "submitted_at": "2026-07-03T13:26:43.972769",
+    "status": "open",
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "resolution": null
+  }
+]
