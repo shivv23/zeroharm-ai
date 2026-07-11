@@ -134,7 +134,25 @@ VISION_ENABLED = os.getenv("VISION_ENABLED", "false").lower() == "true"
 
 # JWT
 JWT_SECRET = os.getenv("JWT_SECRET", "zeroharm-default-secret-change-in-production")
+if JWT_SECRET == "zeroharm-default-secret-change-in-production":
+    import logging
+    logging.getLogger("zeroharm").warning("SECURITY: Using default JWT_SECRET! Set JWT_SECRET in .env for production.")
 JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", "24"))
+
+# Feature flags for memory-constrained environments
+ENABLE_SEMANTIC_SEARCH = os.getenv("ENABLE_SEMANTIC_SEARCH", "false").lower() == "true"
+MAX_MEMORY_MB = int(os.getenv("MAX_MEMORY_MB", "0"))
+_heavy_features = []
+if VISION_ENABLED:
+    _heavy_features.append("vision (VISION_ENABLED)")
+if ENABLE_SEMANTIC_SEARCH:
+    _heavy_features.append("semantic search (ENABLE_SEMANTIC_SEARCH)")
+if _heavy_features:
+    import logging
+    logging.getLogger("zeroharm").info(
+        f"Enabled: {', '.join(_heavy_features)}. "
+        f"If on a memory-constrained host (<512MB), set these to 'false'."
+    )
 
 # Alert channel env vars
 SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")

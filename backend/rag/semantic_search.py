@@ -33,6 +33,9 @@ class SemanticSearchPipeline:
 
     def _lazy_load(self):
         if self._model is None:
+            if not C.ENABLE_SEMANTIC_SEARCH:
+                self._model = False
+                return
             try:
                 from sentence_transformers import SentenceTransformer
                 model = SentenceTransformer('all-MiniLM-L6-v2')

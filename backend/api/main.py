@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import gc
 import json
 import logging
 import os
@@ -42,8 +43,7 @@ from orchestrator.incident_pattern_intelligence import IncidentPatternIntelligen
 from orchestrator.what_if_simulator import WhatIfSimulator
 from orchestrator.incident_investigation import IncidentInvestigation
 from report_generator import ReportGenerator
-from predictive_risk import PredictiveRiskForecaster
-from anomaly_detector import SensorAnomalyDetector
+
 from shift_handover import generate_shift_handover
 from chat_assistant import ChatAssistant
 from cost_of_safety import compute_cost_of_safety
@@ -74,6 +74,27 @@ _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 _ip_request_log: Dict[str, list] = {}
 _ip_lock = asyncio.Lock()
+_ws_rate: Dict[str, list] = {}
+_ws_rate_lock = asyncio.Lock()
+_LAST_CLEANUP = time.time()
+
+
+async def _cleanup_rate_limits():
+    global _LAST_CLEANUP
+    now = time.time()
+    if now - _LAST_CLEANUP < 300:
+        return
+    _LAST_CLEANUP = now
+    cutoff = now - C.RATE_LIMIT_WINDOW
+    async with _ip_lock:
+        stale = [ip for ip, ts in _ip_request_log.items() if not ts or ts[-1] < cutoff]
+        for ip in stale:
+            del _ip_request_log[ip]
+    async with _ws_rate_lock:
+        all_ts = list(_ws_rate.items())
+        stale_ws = [ip for ip, ts in all_ts if not ts or ts[-1] < cutoff]
+        for ip in stale_ws:
+            del _ws_rate[ip]
 
 
 async def verify_api_key(api_key: str = Depends(_api_key_header)):
@@ -85,6 +106,7 @@ async def verify_api_key(api_key: str = Depends(_api_key_header)):
 async def rate_limit(request):
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
+    await _cleanup_rate_limits()
     async with _ip_lock:
         timestamps = _ip_request_log.get(client_ip, [])
         timestamps = [t for t in timestamps if now - t < C.RATE_LIMIT_WINDOW]
@@ -114,6 +136,8 @@ class ZeroHarmAPI:
         self.incident_investigation = IncidentInvestigation()
         self.report_generator = ReportGenerator()
         self.alert_dispatcher = AlertDispatcher()
+        from predictive_risk import PredictiveRiskForecaster
+        from anomaly_detector import SensorAnomalyDetector
         self.predictor = PredictiveRiskForecaster()
         self.anomaly_detector = SensorAnomalyDetector()
         self.chat = ChatAssistant()
@@ -168,13 +192,14 @@ class ZeroHarmAPI:
                     self.plant_state = self.generator.apply_scenario_overrides(state, self.scenario_state)
                 else:
                     self.plant_state = state
-                self._plant_snapshot = copy.deepcopy(self.plant_state)
-                await save_plant_state(self._plant_snapshot)
-                for sid, s in self._plant_snapshot.get("sensors", {}).items():
+                snapshot = copy.deepcopy(self.plant_state)
+                self._plant_snapshot = snapshot
+                await save_plant_state(snapshot)
+                for sid, s in snapshot.get("sensors", {}).items():
                     await save_sensor_reading(s)
-                for p in self._plant_snapshot.get("active_permits", []):
+                for p in snapshot.get("active_permits", []):
                     await save_permit(p)
-                risk_result = await self.risk_engine.run_async(copy.deepcopy(self._plant_snapshot))
+                risk_result = await self.risk_engine.run_async(snapshot)
                 self._last_risk_result = risk_result
                 self.predictor.feed(risk_result.get("risk_score", 0))
                 for sid, s in self._plant_snapshot.get("sensors", {}).items():
@@ -215,8 +240,18 @@ class ZeroHarmAPI:
                     for cr in compound_risks[:C.MAX_COMPOUND_RISKS_TO_LOG]:
                         self.activity_feed.log_compound_risk(cr.get("zone_name", ""), 1, cr.get("recommendation", ""))
                 step_count += 1
+                if step_count % 100 == 0:
+                    gc.collect()
+                    try:
+                        with open("/proc/self/status") as f:
+                            for line in f:
+                                if line.startswith("VmRSS:"):
+                                    logger.debug(f"Memory: {line.strip()}")
+                                    break
+                    except FileNotFoundError:
+                        pass
                 if step_count % C.COMPLIANCE_AUDIT_INTERVAL == 0:
-                    compliance_result = await asyncio.to_thread(self.compliance_agent.run_audit, copy.deepcopy(self._plant_snapshot))
+                    compliance_result = await asyncio.to_thread(self.compliance_agent.run_audit, snapshot)
                     self._last_compliance_result = compliance_result
                     await save_compliance_audit(compliance_result)
                     v_count = len(compliance_result.get("violations", []))
@@ -298,6 +333,10 @@ async def lifespan(app: FastAPI):
     yield
     api.simulation_running = False
     loop_task.cancel()
+    try:
+        await asyncio.wait_for(loop_task, timeout=5.0)
+    except (asyncio.CancelledError, asyncio.TimeoutError):
+        pass
     async with api.connections_lock:
         for ws in api.active_connections:
             try:
@@ -319,7 +358,7 @@ app.add_middleware(
     allow_origins=C.ALLOWED_ORIGINS if C.ALLOWED_ORIGINS != ["*"] else ["*"],
     allow_credentials=C.ALLOWED_ORIGINS != ["*"],
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "X-API-Key"],
+    allow_headers=["Content-Type", "X-API-Key", "Authorization"],
 )
 
 
@@ -1092,6 +1131,20 @@ async def get_incident_report(incident_id: str):
     )
 
 
+async def _check_ws_rate(websocket: WebSocket) -> bool:
+    client_ip = websocket.client.host if websocket.client else "unknown"
+    now = time.time()
+    async with _ws_rate_lock:
+        timestamps = _ws_rate.get(client_ip, [])
+        timestamps = [t for t in timestamps if now - t < 60]
+        if len(timestamps) >= 60:
+            await websocket.close(code=1008, reason="Rate limit exceeded")
+            return False
+        timestamps.append(now)
+        _ws_rate[client_ip] = timestamps
+    return True
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     origin = websocket.headers.get("origin", "")
@@ -1108,6 +1161,8 @@ async def websocket_endpoint(websocket: WebSocket):
     logger.info(f"Client connected. Total: {len(api.active_connections)}")
     try:
         while True:
+            if not await _check_ws_rate(websocket):
+                break
             raw = await websocket.receive_text()
             if len(raw) > C.MAX_WS_MESSAGE_SIZE:
                 await websocket.send_json({"type": "error", "message": "Message too large"})
@@ -1158,8 +1213,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     api.scenario_id = None
                     api.plant_state = api.generator.step()
                     api._plant_snapshot = copy.deepcopy(api.plant_state)
-                    api.last_risk_result = await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
-                    risk_result = api.last_risk_result
+                    risk_result = await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
+                    api._last_risk_result = risk_result
                     sev = risk_result.get("severity", C.SENSOR_STATUS_NORMAL)
                     if sev in C.HIGH_RISK_LEVELS:
                         api.alert_dispatcher.dispatch({
@@ -1173,7 +1228,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_json({"type": "what_if_reset", "plant": api._plant_snapshot, "risk": risk_result, "activity": api.activity_feed.get_recent(10)})
                 elif action == "sync_state":
                     if api._plant_snapshot:
-                        risk = api.last_risk_result or await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
+                        risk = api._last_risk_result or await api.risk_engine.run_async(copy.deepcopy(api._plant_snapshot))
                         await websocket.send_json({
                             "type": "state_update",
                             "plant": api._plant_snapshot,

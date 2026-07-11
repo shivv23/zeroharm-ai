@@ -62,7 +62,7 @@ ZeroHarm AI bridges the gap between raw sensor data and safety-critical decision
 
 1. **Compound risk detection over single-threshold alerts** — Most safety systems fire alerts when a single sensor crosses a threshold. ZeroHarm correlates *multiple conditions simultaneously* (e.g., confined space permit + O₂ depletion + LEL rise = IMMEDIATE SUSPENSION, not three separate warnings).
 
-2. **Multi-agent fusion architecture** — Three specialized agents run in parallel via `asyncio.gather`, each analyzing a different dimension (sensors, permits, maintenance). The supervisor weights their outputs and only escalates when the combined risk exceeds thresholds.
+2. **Multi-agent fusion architecture** — Three specialized agents (sensor, permit, maintenance) run concurrently via `asyncio.gather` over a thread pool, each analyzing a different dimension. The fusion supervisor weights their outputs and only escalates when combined risk exceeds thresholds.
 
 3. **Regulatory-grounded compliance** — Every compliance check maps to specific regulatory standards (OISD-STD-116, Factory Act Sec 36/37, ISO 45001), not generic best-practice lists.
 
@@ -77,10 +77,10 @@ Frontend (React 18) ←── WebSocket + REST ──→ API Gateway (FastAPI)
                                                   │
                                         Orchestration Layer
                                         ├── Compound Risk Detection Engine
-                                        │   ├── Sensor Monitor Agent
-                                        │   ├── Permit Activity Agent
-                                        │   ├── Maintenance Status Agent
-                                        │   └── Fusion Supervisor
+                                        │   ├── Sensor Monitor Agent (concurrent)
+                                        │   ├── Permit Activity Agent (concurrent)
+                                        │   ├── Maintenance Status Agent (concurrent)
+                                        │   └── Fusion Supervisor (weighted)
                                         ├── RAG Pipeline (regulatory compliance)
                                         ├── Emergency Response Orchestrator
                                         ├── Incident Pattern Intelligence
@@ -263,7 +263,9 @@ This is a hackathon prototype with simulated data. Key gaps vs. a production sys
 | Real sensor integration | 🔴 High | Currently uses synthetic data (80 sensors, realistic noise models) |
 | Production database | 🟡 Medium | SQLite sufficient for demo; would need PostgreSQL for production |
 | 3D digital twin | 🟢 Low | 2D SVG heatmap with geospatial overlay |
-| Full test coverage | 🟡 Medium | 8 integration tests cover core agent pipeline |
+| Full test coverage | 🟡 Medium | Core agent pipeline tested; API, WebSocket, and auth not covered |
+| JWT secret rotation | 🟡 Medium | Must set JWT_SECRET in .env for any non-development use |
+| Default admin account | 🟡 Medium | Fallback admin/admin123 created if no users.json found |
 
 ---
 

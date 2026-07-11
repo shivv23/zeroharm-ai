@@ -126,9 +126,12 @@ class CompoundRiskDetectionEngine:
         return state
 
     async def run_async(self, plant_state: Dict) -> Dict:
-        sensor_findings = await asyncio.to_thread(self.sensor_agent.analyze, copy.deepcopy(plant_state))
-        permit_findings = await asyncio.to_thread(self.permit_agent.analyze, copy.deepcopy(plant_state))
-        maint_findings = await asyncio.to_thread(self.maintenance_agent.analyze, copy.deepcopy(plant_state))
+        plant_copy = copy.deepcopy(plant_state)
+        sensor_findings, permit_findings, maint_findings = await asyncio.gather(
+            asyncio.to_thread(self.sensor_agent.analyze, plant_copy),
+            asyncio.to_thread(self.permit_agent.analyze, plant_copy),
+            asyncio.to_thread(self.maintenance_agent.analyze, plant_copy),
+        )
         state: AgentState = {
             "plant_state": plant_state,
             "sensor_findings": sensor_findings, "permit_findings": permit_findings,

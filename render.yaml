@@ -19,7 +19,7 @@ services:
       - key: API_KEY
         generateValue: true
       - key: DATABASE_URL
-        value: sqlite:///data/zeroharm.db
+        value: sqlite+aiosqlite:///data/zeroharm.db
       - key: JWT_EXPIRY_HOURS
         value: 24
 
