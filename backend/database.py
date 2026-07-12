@@ -203,7 +203,7 @@ async def save_permit(permit: Dict[str, Any]) -> None:
                 conditions_check=permit.get("conditions_check", False),
                 timestamp=datetime.now(),
             )
-            session.merge(model)
+            await session.merge(model)
 
 
 async def save_incident(incident: Dict[str, Any]) -> None:
@@ -233,7 +233,7 @@ async def save_incident(incident: Dict[str, Any]) -> None:
                 details=json.dumps(incident, default=str),
                 timestamp=datetime.now(),
             )
-            session.merge(model)
+            await session.merge(model)
 
 
 async def save_compliance_audit(audit: Dict[str, Any]) -> None:
