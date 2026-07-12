@@ -149,3 +149,30 @@ class ObservationReviewRequest(BaseModel):
     reviewer: str = Field(..., min_length=1)
     resolution: str = Field(..., min_length=1)
     status: str = "closed"
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(..., min_length=1)
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=4)
+
+
+class ResetPasswordRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=4)
+
+
+class AuditLogQuery(BaseModel):
+    action: Optional[str] = None
+    resource: Optional[str] = None
+    username: Optional[str] = None
+    limit: int = Field(default=100, ge=1, le=1000)
+    offset: int = Field(default=0, ge=0)
+
+
+class BulkExportRequest(BaseModel):
+    resources: list[str] = Field(default_factory=lambda: ["sensors", "permits", "alerts", "incidents"])
+    format: str = Field(default="csv", pattern=r"^(csv|json)$")

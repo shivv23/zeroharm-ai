@@ -230,6 +230,8 @@ export const APP_TABS = [
   { id: 'eqhealth', label: 'Equip Health', icon: '\u{1F527}' },
   { id: 'observations', label: 'Observations', icon: '\u{1F4A1}' },
   { id: 'environmental', label: 'Environment', icon: '\u{1F30D}' },
+  { id: 'analytics', label: 'Analytics', icon: '\u{1F4CA}' },
+  { id: 'admin', label: 'Admin', icon: '\u{2699}\uFE0F' },
 ];
 
 // -------- Alert Duration Defaults --------

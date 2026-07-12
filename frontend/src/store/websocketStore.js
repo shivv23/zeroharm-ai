@@ -4,6 +4,10 @@ const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 const RECONNECT_MAX_RETRIES = 20;
 
+function getToken() {
+  try { return localStorage.getItem('zeroharm_token') || ''; } catch (e) { return ''; }
+}
+
 class ZeroHarmWebSocket {
   constructor() {
     this.ws = null;
@@ -20,8 +24,10 @@ class ZeroHarmWebSocket {
   connect() {
     this._intentionalDisconnect = false;
     this._reconnectAttempts = 0;
+    const token = getToken();
+    const url = token ? `${WS_URL}?token=${encodeURIComponent(token)}` : WS_URL;
     try {
-      this.ws = new WebSocket(WS_URL);
+      this.ws = new WebSocket(url);
       this.ws.onopen = () => {
         this.isConnected = true;
         this._reconnectAttempts = 0;
@@ -121,7 +127,9 @@ class ZeroHarmWebSocket {
 
   async fetchAPI(endpoint, options = {}) {
     try {
-      const fetchOpts = { method: options.method || 'GET', headers: { 'Content-Type': 'application/json', ...options.headers } };
+      const token = getToken();
+      const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const fetchOpts = { method: options.method || 'GET', headers: { 'Content-Type': 'application/json', ...authHeaders, ...options.headers } };
       if (options.body) fetchOpts.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
       const res = await fetch(`${API_BASE}${endpoint}`, fetchOpts);
       if (!res.ok) {

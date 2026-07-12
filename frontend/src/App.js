@@ -4,6 +4,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
 import MobileDashboard from './components/MobileDashboard';
 import PushNotificationManager from './components/PushNotificationManager';
+import AdminPanel from './components/AdminPanel';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
 import { PLANT_ZONES, getRiskColor } from './store/plantData';
 
 const GeospatialHeatmap = lazy(() => import('./components/GeospatialHeatmap'));
@@ -63,7 +65,48 @@ function TabFallback() {
   return <div style={{ padding: 40, textAlign: 'center', color: COLOR_TEXT_MUTED }}>Loading...</div>;
 }
 
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
+async function apiPost(path, body) {
+  const token = localStorage.getItem('zeroharm_token') || '';
+  const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  try { const r = await fetch(`${API_BASE}${path}`, { method: 'POST', headers, body: JSON.stringify(body) }); return await r.json(); } catch (e) { return null; }
+}
+
+function LoginScreen({ onLogin }) {
+  const [username, setUser] = useState('');
+  const [password, setPass] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const doLogin = async () => {
+    setLoading(true); setError('');
+    const data = await apiPost('/auth/login', { username, password });
+    setLoading(false);
+    if (data && data.access_token) {
+      localStorage.setItem('zeroharm_token', data.access_token);
+      if (data.refresh_token) localStorage.setItem('zeroharm_refresh', data.refresh_token);
+      onLogin(data.access_token);
+    } else {
+      setError('Invalid credentials');
+    }
+  };
+  return (
+    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#080c16' }}>
+      <div style={{ background: '#111827', padding: 32, borderRadius: 8, border: '1px solid #1f2937', width: 320 }}>
+        <div style={{ fontSize: 22, fontWeight: 700, textAlign: 'center', marginBottom: 4, background: 'linear-gradient(90deg, #00e5ff, #00bcd4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>ZeroHarm AI</div>
+        <div style={{ fontSize: 11, color: '#6b7280', textAlign: 'center', marginBottom: 20 }}>Industrial Safety Intelligence</div>
+        {error && <div style={{ padding: '6px 12px', marginBottom: 12, background: 'rgba(255,23,68,0.1)', border: '1px solid rgba(255,23,68,0.3)', borderRadius: 4, fontSize: 11, color: '#ff1744' }}>{error}</div>}
+        <input style={{ width: 'calc(100% - 16px)', padding: '8px 8px', marginBottom: 10, background: '#0d1520', color: '#e0e5ec', border: '1px solid #1f2937', borderRadius: 4, fontSize: 13, outline: 'none' }} placeholder="Username" value={username} onChange={e => setUser(e.target.value)} onKeyDown={e => e.key === 'Enter' && doLogin()} />
+        <input style={{ width: 'calc(100% - 16px)', padding: '8px 8px', marginBottom: 16, background: '#0d1520', color: '#e0e5ec', border: '1px solid #1f2937', borderRadius: 4, fontSize: 13, outline: 'none' }} type="password" placeholder="Password" value={password} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === 'Enter' && doLogin()} />
+        <button style={{ width: '100%', padding: '10px 0', background: 'linear-gradient(90deg, #00e5ff, #00bcd4)', color: '#000', border: 'none', borderRadius: 4, fontWeight: 700, fontSize: 13, cursor: 'pointer' }} onClick={doLogin} disabled={loading}>{loading ? 'Signing in...' : 'Sign In'}</button>
+        <div style={{ fontSize: 10, color: '#4b5563', textAlign: 'center', marginTop: 12 }}>Default: admin / admin123</div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const [authenticated, setAuthenticated] = useState(!!localStorage.getItem('zeroharm_token'));
   const [connected, setConnected] = useState(false);
   const [plantState, setPlantState] = useState(null);
   const [riskData, setRiskData] = useState(null);
@@ -116,7 +159,13 @@ export default function App() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), duration);
   }, []);
 
+  const handleLogin = useCallback((token) => {
+    setAuthenticated(true);
+    ws.connect();
+  }, []);
+
   useEffect(() => {
+    if (!authenticated) return;
     ws.connect();
     const unsub1 = ws.on('connection', (d) => {
       setConnected(d.connected);
@@ -236,12 +285,20 @@ export default function App() {
           return <SafetyObservations />;
         case 'environmental':
           return <EnvironmentalDashboard />;
+        case 'analytics':
+          return <AnalyticsDashboard riskTrend={riskTrend} />;
+        case 'admin':
+          return <AdminPanel />;
         default:
           return null;
       }
     })();
     return <ErrorBoundary key={tabId}><Suspense fallback={<TabFallback />}>{content}</Suspense></ErrorBoundary>;
   };
+
+  if (!authenticated) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
 
   if (isMobile) {
     return (

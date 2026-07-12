@@ -121,7 +121,7 @@ _async_session_maker = None
 async def init_db():
     global _engine, _async_session_maker
     database_url = C.DATABASE_URL
-    _engine = create_async_engine(database_url, echo=False)
+    _engine = create_async_engine(database_url, echo=False, pool_size=5, max_overflow=10, pool_pre_ping=True)
     _async_session_maker = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

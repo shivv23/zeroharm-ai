@@ -1,8 +1,8 @@
 {
   "users": [
-    {"username": "admin", "password": "admin123", "role": "admin", "tenant_id": "plant_1", "name": "System Administrator"},
-    {"username": "safety_officer", "password": "safety123", "role": "safety_officer", "tenant_id": "plant_1", "name": "Safety Officer"},
-    {"username": "operator", "password": "operator123", "role": "operator", "tenant_id": "plant_1", "name": "Shift Operator"},
-    {"username": "viewer", "password": "viewer123", "role": "viewer", "tenant_id": "plant_1", "name": "Read-only User"}
+    {"username": "admin", "password_hash": "", "role": "admin", "tenant_id": "plant_1", "name": "System Administrator"},
+    {"username": "safety_officer", "password_hash": "", "role": "safety_officer", "tenant_id": "plant_1", "name": "Safety Officer"},
+    {"username": "operator", "password_hash": "", "role": "operator", "tenant_id": "plant_1", "name": "Shift Operator"},
+    {"username": "viewer", "password_hash": "", "role": "viewer", "tenant_id": "plant_1", "name": "Read-only User"}
   ]
 }
