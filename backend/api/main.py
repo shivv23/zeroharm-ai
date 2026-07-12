@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Dict, Optional
 from io import BytesIO
 from contextlib import asynccontextmanager
+from starlette.requests import Request
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -110,7 +111,7 @@ async def verify_api_key(api_key: str = Depends(_api_key_header)):
     return api_key
 
 
-async def rate_limit(request):
+async def rate_limit(request: Request):
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
     await _cleanup_rate_limits()
