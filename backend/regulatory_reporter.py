@@ -30,7 +30,7 @@ STYLES.add(ParagraphStyle("ReportSubtitle", fontName="Helvetica", fontSize=9,
                           textColor=TEXT_SEC, spaceAfter=12))
 STYLES.add(ParagraphStyle("SectionH", fontName="Helvetica-Bold", fontSize=11,
                           textColor=ACCENT, spaceBefore=12, spaceAfter=6))
-STYLES.add(ParagraphStyle("BodyText", fontName="Helvetica", fontSize=8,
+STYLES.add(ParagraphStyle("BodyCustom", fontName="Helvetica", fontSize=8,
                           textColor=TEXT_PRI, leading=11))
 STYLES.add(ParagraphStyle("SmallText", fontName="Helvetica", fontSize=7,
                           textColor=TEXT_SEC, leading=9))
@@ -43,7 +43,7 @@ STYLES.add(ParagraphStyle("StatusFail", fontName="Helvetica-Bold", fontSize=8,
 def _make_table(headers, rows, col_widths=None):
     data = [[Paragraph(h, STYLES["SmallText"]) for h in headers]]
     for row in rows:
-        data.append([Paragraph(str(c), STYLES["BodyText"]) for c in row])
+        data.append([Paragraph(str(c), STYLES["BodyCustom"]) for c in row])
     t = Table(data, colWidths=col_widths, repeatRows=1)
     style_cmds = [
         ("BACKGROUND", (0, 0), (-1, 0), DARK_CARD),
@@ -139,7 +139,7 @@ def _generate_standard_report(standard_name: str, standard_ref: str,
             col_widths=[80, 200, 50],
         ))
     else:
-        elements.append(Paragraph("No compliance checklist data available.", STYLES["BodyText"]))
+        elements.append(Paragraph("No compliance checklist data available.", STYLES["BodyCustom"]))
 
     elements.append(Spacer(1, 4 * mm))
     elements.append(Paragraph("3. Regulatory Standards Reference", STYLES["SectionH"]))

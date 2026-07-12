@@ -10,7 +10,10 @@ PyJWT>=2.8.0
 sqlalchemy>=2.0.0
 aiosqlite>=0.19.0
 reportlab>=4.0.0
-sentence-transformers>=2.2.0
 twilio>=8.0.0
-opencv-python>=4.8.0
-ultralytics>=8.0.0
+scikit-learn>=1.5.0
+
+# Heavy/optional — install only if needed:
+# sentence-transformers>=2.2.0
+# opencv-python>=4.8.0
+# ultralytics>=8.0.0
