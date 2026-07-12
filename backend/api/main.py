@@ -173,7 +173,8 @@ class ZeroHarmAPI:
         self._plant_snapshot = {}
 
     def _get_snapshot(self):
-        self._get_snapshot()
+        if not self._plant_snapshot:
+            self._plant_snapshot = self.generator.step()
         return self._plant_snapshot
 
     async def _compute_health_index(self, plant_state, risk_result, compliance_result):
