@@ -310,17 +310,22 @@ zeroharm-ai/
 
 ### Docker (Self-Hosted)
 
-The application is configured for deployment on Render using `render.yaml`:
+```bash
+docker compose up -d --build
+# Backend: http://localhost:8000
+# Frontend: http://localhost:80
+# API docs: http://localhost:8000/docs
+```
 
-- **Backend:** `uvicorn` ASGI server via `gunicorn -k uvicorn.workers.UvicornWorker`
-- **Frontend:** Static site with SPA rewrite rule for client-side routing
-- **Memory:** 512MB starter plan
-- **Graceful degradation:** Heavy ML dependencies (sentence-transformers, ultralytics, opencv-python) are optional — the app functions fully without them
+The application runs in two containers behind an nginx reverse proxy:
+- **Backend:** FastAPI + Uvicorn ASGI server (port 8000, internal)
+- **Frontend:** Static React build served by nginx (port 80, public), with `/api/` paths proxied to the backend
+- **Database:** SQLite persisted via Docker named volume (`zeroharm_data`)
+- **WebSocket:** Real-time state updates every 2 seconds (connect at `ws://host/ws`)
 
-Set the following environment variables:
+Set optional environment variables in `docker-compose.yml`:
 - `JWT_SECRET` — Secret key for token signing
-- `ALLOWED_ORIGINS` — Comma-separated CORS origins
-- `API_KEY` — Optional API key for external service auth
+- `ALLOWED_ORIGINS` — Comma-separated CORS origins (only needed for direct backend access)
 
 ---
 
