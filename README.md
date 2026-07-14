@@ -4,6 +4,8 @@
 
 **ZeroHarm AI** is a multi-agent industrial safety intelligence platform that detects compound risks before they become catastrophes. Built for the **ET AI Hackathon 2026** — Problem Statement 1: AI-Powered Industrial Safety Intelligence for Zero-Harm Operations.
 
+**Team:** shivamkumar0423
+
 ---
 
 ## The Problem
@@ -332,3 +334,6 @@ Set optional environment variables in `docker-compose.yml`:
 ## License
 
 MIT
+
+---
+*Built by **shivamkumar0423** for ET AI Hackathon 2026*
