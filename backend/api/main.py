@@ -334,6 +334,7 @@ def require_permission(permission: str):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("ZeroHarm AI Platform starting...")
+    api.knowledge_graph.initialize()
     await init_db()
     if not api.plant_state:
         recent = await get_recent_plant_states(1)

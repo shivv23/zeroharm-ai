@@ -49,17 +49,17 @@ export default function IncidentInvestigation() {
   }, []);
 
   const loadStats = useCallback(async () => {
-    const res = await apiFetch('/api/capa/statistics');
+    const res = await apiFetch('/capa/statistics');
     if (res) setStats(res);
   }, [apiFetch]);
 
   const loadOpenCapas = useCallback(async () => {
-    const res = await apiFetch('/api/capa/open');
+    const res = await apiFetch('/capa/open');
     if (res?.open_capas) setOpenCapas(res.open_capas);
   }, [apiFetch]);
 
   const loadInvestigation = useCallback(async (id) => {
-    const res = await apiFetch(`/api/investigation/${id}`);
+    const res = await apiFetch(`/investigation/${id}`);
     if (res && res.id) {
       setSelectedInv(res);
       if (res.five_why) {
@@ -78,7 +78,7 @@ export default function IncidentInvestigation() {
   useEffect(() => { loadStats(); loadOpenCapas(); }, [loadStats, loadOpenCapas]);
 
   const handleCreateInvestigation = async () => {
-    const res = await apiFetch('/api/investigation/create', {
+    const res = await apiFetch('/investigation/create', {
       method: 'POST',
       body: JSON.stringify({ incident_data: { description: `Manual investigation ${new Date().toISOString()}` } }),
     });

@@ -1,3 +1,4 @@
+import logging
 import networkx as nx
 from typing import Dict, List
 
@@ -13,6 +14,23 @@ class IndustrialKnowledgeGraph:
         self.oisd_standards = get_regulatory_standards()
         _kg = get_agent_settings().get("knowledge_graph", {}).get("risk_patterns", {})
         self._risk_patterns = self._load_risk_patterns(_kg)
+
+    def initialize(self):
+        self._build_schema()
+        config_dir = os.path.join(os.path.dirname(__file__), "..", "config")
+        zones_path = os.path.join(config_dir, "zones.json")
+        if os.path.exists(zones_path):
+            with open(zones_path) as f:
+                zones = json.load(f)
+            for z in zones:
+                self.add_zone(z["id"], z["name"], z.get("hazard_class", "Unknown"), z.get("x", 0), z.get("y", 0))
+        for reg_id, desc in self.oisd_standards.items():
+            self.add_regulation(reg_id, desc, [])
+        for (ptype, stype), info in self._risk_patterns.items():
+            self.add_hazard_relationship(ptype, stype, info["regulation"], info["risk"])
+        logger = logging.getLogger(__name__)
+        logger.info("Knowledge graph initialized with %d nodes, %d edges",
+                    self.graph.number_of_nodes(), self.graph.number_of_edges())
 
     def _load_risk_patterns(self, _kg):
         config_path = os.path.join(os.path.dirname(__file__), "..", "config", "kg_risk_patterns.json")
