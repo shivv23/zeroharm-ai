@@ -301,6 +301,13 @@ zeroharm-ai/
 
 ## Deployment
 
+### Live Demo
+
+- **Frontend:** [https://zero-harmer-frontend.onrender.com](https://zero-harmer-frontend.onrender.com)
+- **Backend API:** [https://zero-harmer-backend.onrender.com/api/health](https://zero-harmer-backend.onrender.com/api/health)
+
+> **Note:** Free tier may spin down after inactivity — allow 30-60s for cold start.
+
 ### Render (Free Tier)
 
 The application is configured for deployment on Render using `render.yaml`:
