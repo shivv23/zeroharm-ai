@@ -25,9 +25,8 @@ backend/data/
 *.db
 /package-lock.json
 
-# Dev utility scripts (keep local only)
+# PPT generator (keep local only, PPT submitted separately)
 /create_ppt.py
-/scripts/
 
 # PowerPoint temp files
 ~$*.pptx
