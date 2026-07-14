@@ -1,6 +1,7 @@
 node_modules/
 frontend/build/
 __pycache__/
+.pytest_cache/
 *.pyc
 *.pyo
 .env
@@ -28,5 +29,5 @@ backend/data/
 # PPT generator (keep local only, PPT submitted separately)
 /create_ppt.py
 
-# PowerPoint temp files
-~$*.pptx
+# PowerPoint files (submitted separately)
+*.pptx

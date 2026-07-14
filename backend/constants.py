@@ -24,7 +24,7 @@ PLANT_NAME = "Visakhapatnam Steel Plant"
 # API metadata
 APP_TITLE = "ZeroHarm AI - Industrial Safety Intelligence Platform"
 APP_VERSION = "1.0.0"
-_DEFAULT_ORIGINS = "http://localhost:3000,http://localhost:8080,http://13.59.83.134"
+_DEFAULT_ORIGINS = "http://localhost:3000,http://localhost:80,http://13.59.83.134"
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",")
 
 # Security

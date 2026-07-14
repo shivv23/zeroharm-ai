@@ -1,3 +1,6 @@
+# ZeroHarm AI – Render.com Deployment (Alternative)
+# Primary deployment: AWS EC2 via docker-compose.yml
+# See README.md → Deployment section for details.
 services:
   - type: web
     name: zero-harmer-backend

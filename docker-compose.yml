@@ -13,7 +13,7 @@ services:
       - RISK_TREND_MAX=60
       - HIGH_RISK_PERMIT_PENALTY=0.15
       - RAG_DEFAULT_TOP_K=3
-      - ALLOWED_ORIGINS=http://13.59.83.134,http://localhost:3000,http://localhost:8080
+      - ALLOWED_ORIGINS=http://13.59.83.134,http://localhost:3000,http://localhost:80
     healthcheck:
       test: wget -qO- http://localhost:8000/api/health || exit 1
       interval: 30s
