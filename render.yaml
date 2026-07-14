@@ -25,8 +25,12 @@ services:
 
 static_sites:
   - name: zero-harmer-frontend
-    buildCommand: cd frontend && REACT_APP_WS_URL=$REACT_APP_WS_URL REACT_APP_API_URL=$REACT_APP_API_URL npm install && npm run build
+    buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
       - key: REACT_APP_WS_URL
         value: wss://zero-harmer-backend.onrender.com/ws
