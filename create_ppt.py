@@ -266,7 +266,7 @@ stack = [
     ("Authentication", "JWT (PyJWT) + bcrypt password hashing"),
     ("PDF Generation", "ReportLab"),
     ("Containerization", "Docker, docker-compose"),
-    ("Deployment", "Render (free tier — 512MB)"),
+    ("Deployment", "AWS EC2 (t2.micro, Docker)"),
     ("Data Generation", "NumPy-based synthetic simulation engine"),
 ]
 for i, (layer, tech) in enumerate(stack):
@@ -443,7 +443,7 @@ add_card(slide, Inches(6.8), Inches(1.5), Inches(5.8), Inches(2.5),
     "Deployment Options",
     "Docker: docker compose up -d (backend :8000, frontend :8080)\n"
     "Manual: pip install + uvicorn (backend), npm install + npm start (frontend)\n"
-    "Render: render.yaml config for free-tier deployment (512MB)\n\n"
+    "AWS: http://13.59.83.134 (EC2 t2.micro, Docker Compose)\n\n"
     "Requirements:\n"
     "  Python 3.13+, Node 20+\n"
     "  Core: fastapi, uvicorn, sqlalchemy, aiosqlite, numpy, pyjwt, bcrypt\n"
@@ -469,7 +469,7 @@ add_text_box(slide, Inches(1), Inches(2.8), Inches(11.3), Inches(1.2), "Thank Yo
 add_text_box(slide, Inches(1), Inches(3.9), Inches(11.3), Inches(0.6), "ZeroHarm AI — Industrial Safety Intelligence Platform", font_size=22, color=LIGHT, alignment=PP_ALIGN.CENTER)
 add_text_box(slide, Inches(1), Inches(4.8), Inches(11.3), Inches(0.5), "ET AI Hackathon 2026", font_size=16, color=GRAY, alignment=PP_ALIGN.CENTER)
 add_text_box(slide, Inches(1), Inches(5.5), Inches(11.3), Inches(0.5), "Created by Shivam Kumar", font_size=20, bold=True, color=ACCENT, alignment=PP_ALIGN.CENTER)
-add_text_box(slide, Inches(1), Inches(6.2), Inches(11.3), Inches(0.4), "Live Demo: https://zero-harmer-frontend.onrender.com", font_size=14, color=ACCENT, alignment=PP_ALIGN.CENTER)
+add_text_box(slide, Inches(1), Inches(6.2), Inches(11.3), Inches(0.4), "Live Demo: http://13.59.83.134", font_size=14, color=ACCENT, alignment=PP_ALIGN.CENTER)
 slide_number(slide, 13, TOTAL)
 
 output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ZeroHarm_AI_Presentation.pptx")
