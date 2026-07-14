@@ -24,3 +24,7 @@ dist/
 backend/data/
 *.db
 /package-lock.json
+
+# Dev utility scripts (keep local only)
+/create_ppt.py
+/scripts/
