@@ -137,8 +137,9 @@ class DigitalTwinAggregator:
         if not risk_trend or len(risk_trend) < 5:
             return "insufficient_data"
         recent = risk_trend[-5:]
-        if recent[-1] > recent[0] * 1.1:
+        scores = [r if isinstance(r, (int, float)) else r.get("score", 0) for r in recent]
+        if scores[-1] > scores[0] * 1.1:
             return "increasing"
-        if recent[-1] < recent[0] * 0.9:
+        if scores[-1] < scores[0] * 0.9:
             return "decreasing"
         return "stable"

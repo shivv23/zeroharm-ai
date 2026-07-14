@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 const C = {
   bg: '#080c16', card: '#111827', border: '#1f2937', text: '#e0e5ec',
@@ -50,9 +50,10 @@ function MiniSparkline({ data, color }) {
 export default function DigitalTwinDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const initialLoad = useRef(true);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    if (initialLoad.current) setLoading(true);
     try {
       const res = await fetch('/api/digital-twin');
       if (!res.ok) throw new Error('Failed');
@@ -62,6 +63,7 @@ export default function DigitalTwinDashboard() {
       setData(null);
     } finally {
       setLoading(false);
+      initialLoad.current = false;
     }
   }, []);
 

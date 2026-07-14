@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import './store/authFetch';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import ws from './store/websocketStore';
 import ErrorBoundary from './components/ErrorBoundary';
 import Toast from './components/Toast';
@@ -7,32 +8,31 @@ import PushNotificationManager from './components/PushNotificationManager';
 import AdminPanel from './components/AdminPanel';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import { PLANT_ZONES, getRiskColor } from './store/plantData';
-
-const GeospatialHeatmap = lazy(() => import('./components/GeospatialHeatmap'));
-const RiskPanel = lazy(() => import('./components/RiskPanel'));
-const AlertPanel = lazy(() => import('./components/AlertPanel'));
-const PermitIntelligence = lazy(() => import('./components/PermitIntelligence'));
-const EmergencyResponse = lazy(() => import('./components/EmergencyResponse'));
-const IncidentPatterns = lazy(() => import('./components/IncidentPatterns'));
-const IncidentInvestigation = lazy(() => import('./components/IncidentInvestigation'));
-const ActivityFeed = lazy(() => import('./components/ActivityFeed'));
-const RiskTrendChart = lazy(() => import('./components/RiskTrendChart'));
-const WhatIfSimulator = lazy(() => import('./components/WhatIfSimulator'));
-const CompliancePanel = lazy(() => import('./components/CompliancePanel'));
-const SafetyGamification = lazy(() => import('./components/SafetyGamification'));
-const PredictiveRiskPanel = lazy(() => import('./components/PredictiveRiskPanel'));
-const AnomalyPanel = lazy(() => import('./components/AnomalyPanel'));
-const IsometricPlantView = lazy(() => import('./components/IsometricPlantView'));
-const CostOfSafetyDashboard = lazy(() => import('./components/CostOfSafetyDashboard'));
-const ChatWidget = lazy(() => import('./components/ChatWidget'));
-const RootCauseAnalysis = lazy(() => import('./components/RootCauseAnalysis'));
-const DigitalTwinDashboard = lazy(() => import('./components/DigitalTwinDashboard'));
-const RegulatoryReporter = lazy(() => import('./components/RegulatoryReporter'));
-const PersonnelTracker = lazy(() => import('./components/PersonnelTracker'));
-const AlertTriagePanel = lazy(() => import('./components/AlertTriagePanel'));
-const EquipmentHealthDashboard = lazy(() => import('./components/EquipmentHealthDashboard'));
-const SafetyObservations = lazy(() => import('./components/SafetyObservations'));
-const EnvironmentalDashboard = lazy(() => import('./components/EnvironmentalDashboard'));
+import GeospatialHeatmap from './components/GeospatialHeatmap';
+import RiskPanel from './components/RiskPanel';
+import AlertPanel from './components/AlertPanel';
+import PermitIntelligence from './components/PermitIntelligence';
+import EmergencyResponse from './components/EmergencyResponse';
+import IncidentPatterns from './components/IncidentPatterns';
+import IncidentInvestigation from './components/IncidentInvestigation';
+import ActivityFeed from './components/ActivityFeed';
+import RiskTrendChart from './components/RiskTrendChart';
+import WhatIfSimulator from './components/WhatIfSimulator';
+import CompliancePanel from './components/CompliancePanel';
+import SafetyGamification from './components/SafetyGamification';
+import PredictiveRiskPanel from './components/PredictiveRiskPanel';
+import AnomalyPanel from './components/AnomalyPanel';
+import IsometricPlantView from './components/IsometricPlantView';
+import CostOfSafetyDashboard from './components/CostOfSafetyDashboard';
+import ChatWidget from './components/ChatWidget';
+import RootCauseAnalysis from './components/RootCauseAnalysis';
+import DigitalTwinDashboard from './components/DigitalTwinDashboard';
+import RegulatoryReporter from './components/RegulatoryReporter';
+import PersonnelTracker from './components/PersonnelTracker';
+import AlertTriagePanel from './components/AlertTriagePanel';
+import EquipmentHealthDashboard from './components/EquipmentHealthDashboard';
+import SafetyObservations from './components/SafetyObservations';
+import EnvironmentalDashboard from './components/EnvironmentalDashboard';
 
 import { APP_TABS as TABS, COLORS, LAYOUT, ALERT_AUDIO, TOAST_DURATION } from './store/theme';
 
@@ -121,7 +121,19 @@ export default function App() {
   const [healthIndex, setHealthIndex] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [showDisconnected, setShowDisconnected] = useState(false);
   const toastId = useRef(0);
+  const disconnectTimer = useRef(null);
+
+  useEffect(() => {
+    if (connected) {
+      if (disconnectTimer.current) { clearTimeout(disconnectTimer.current); disconnectTimer.current = null; }
+      setShowDisconnected(false);
+    } else {
+      disconnectTimer.current = setTimeout(() => setShowDisconnected(true), 3000);
+    }
+    return () => { if (disconnectTimer.current) clearTimeout(disconnectTimer.current); };
+  }, [connected]);
 
   useEffect(() => {
     const onResize = () => setWindowWidth(window.innerWidth);
@@ -322,7 +334,7 @@ export default function App() {
   return (
     <div style={styles.container}>
       <Toast toasts={toasts} />
-      {!connected && plantState && (
+      {showDisconnected && plantState && (
         <div style={styles.disconnectedBanner}>
           {'\u{26A0}\uFE0F'} Disconnected — showing cached data. Reconnecting...
         </div>
@@ -451,7 +463,7 @@ const styles = {
     fontFamily: "'SF Mono', 'Fira Code', monospace",
   },
   activeTab: {
-    color: COLOR_ACCENT_CYAN, borderBottomColor: COLOR_ACCENT_CYAN,
+    color: COLOR_ACCENT_CYAN, borderBottom: '2px solid ' + COLOR_ACCENT_CYAN,
     background: 'linear-gradient(0deg, rgba(0,229,255,0.06) 0%, transparent 100%)',
   },
   disconnectedBanner: {

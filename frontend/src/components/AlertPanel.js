@@ -1,5 +1,5 @@
 import React from 'react';
-import { SEVERITY, COLORS, FONT } from '../store/theme';
+import { SEVERITY, COLORS } from '../store/theme';
 
 const SEVERITY_CONFIG = Object.entries(SEVERITY).reduce((acc, [key, val]) => {
   acc[key] = { ...val, icon: key === 'critical' ? '\u{1F525}' : key === 'high' ? '\u{26A0}\uFE0F' : key === 'warning' ? '\u{26A0}\uFE0F' : key === 'info' ? '\u{2139}\uFE0F' : '\u{2705}' };

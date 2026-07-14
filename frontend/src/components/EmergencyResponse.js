@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ws from '../store/websocketStore';
 import { EMERGENCY_TYPES, COLORS } from '../store/theme';
 import GasDispersionOverlay from './GasDispersionOverlay';
@@ -194,7 +194,7 @@ export default function EmergencyResponse({ triggerEmergency = () => {}, resolve
             <div style={{ fontSize: 9, fontWeight: 600, color: COLORS.textMuted, marginBottom: 4 }}>EVENT LOG</div>
             {log.map((entry, i) => (
               <div key={i} style={{ fontSize: 9, color: COLORS.textMuted, padding: '1px 0', fontFamily: 'monospace' }}>
-                [{entry.time}] {entry.msg}
+                [{entry.time}] {entry.text}
               </div>
             ))}
           </div>

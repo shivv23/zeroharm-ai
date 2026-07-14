@@ -41,10 +41,9 @@ export default function IncidentInvestigation() {
 
   const apiFetch = useCallback(async (url, options = {}) => {
     try {
-      const res = await fetch(`${API}${url}`, {
-        headers: { 'Content-Type': 'application/json', ...options.headers },
-        ...options,
-      });
+      const token = localStorage.getItem('zeroharm_token') || '';
+      const headers = { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}), ...options.headers };
+      const res = await fetch(`${API}${url}`, { ...options, headers });
       return await res.json();
     } catch { return null; }
   }, []);

@@ -952,7 +952,8 @@ async def get_predictive_risk():
 async def get_anomalies():
     if not api._plant_snapshot:
         return flagged_response([])
-    results = api.anomaly_detector.scan_all(api._plant_snapshot.get("sensors", {}))
+    sensors = api._plant_snapshot.get("sensors", {})
+    results = await asyncio.to_thread(api.anomaly_detector.scan_all, sensors)
     return flagged_response(results)
 
 
@@ -999,16 +1000,20 @@ async def chat_assistant(req: ChatRequest):
 
 @app.get("/api/digital-twin", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])
 async def get_digital_twin():
-    dashboard = api.digital_twin.build_dashboard(
-        plant_state=api._plant_snapshot,
-        risk_result=api._last_risk_result,
-        compliance_result=api._last_compliance_result,
-        health_index=api._last_health_index,
-        risk_trend=api.risk_trend,
-        alerts=api._last_risk_result.get("alerts", []) if api._last_risk_result else [],
-        activity_feed=api.activity_feed,
-    )
-    return flagged_response(dashboard)
+    try:
+        dashboard = api.digital_twin.build_dashboard(
+            plant_state=api._plant_snapshot or {},
+            risk_result=api._last_risk_result,
+            compliance_result=api._last_compliance_result,
+            health_index=api._last_health_index,
+            risk_trend=api.risk_trend or [],
+            alerts=api._last_risk_result.get("alerts", []) if api._last_risk_result else [],
+            activity_feed=api.activity_feed,
+        )
+        return flagged_response(dashboard)
+    except Exception as e:
+        logger.exception("Digital twin build failed")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
 @app.get("/api/incident/root-cause", dependencies=[Depends(require_permission("read")), Depends(rate_limit)])

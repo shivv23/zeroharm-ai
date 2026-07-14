@@ -26,9 +26,9 @@ export default function SafetyGamification() {
     async function load() {
       const data = await ws.fetchAPI('/safety-scores');
       if (cancelled) return;
-      if (data && data.data) {
-        setScores(data.data.zones || []);
-        setAverage(data.data.plant_average || 0);
+      if (data && data.zones) {
+        setScores(data.zones || []);
+        setAverage(data.plant_average || 0);
       }
       setLoading(false);
     }
