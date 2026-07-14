@@ -28,3 +28,6 @@ backend/data/
 # Dev utility scripts (keep local only)
 /create_ppt.py
 /scripts/
+
+# PowerPoint temp files
+~$*.pptx
