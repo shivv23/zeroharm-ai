@@ -119,7 +119,7 @@ Frontend (React 18) ←── WebSocket + REST ──→ API Gateway (FastAPI)
 ```bash
 docker compose up -d
 # Backend: http://localhost:8000
-# Frontend: http://localhost:8080
+# Frontend: http://localhost:80
 # API docs: http://localhost:8000/docs
 ```
 
@@ -303,12 +303,12 @@ zeroharm-ai/
 
 ### Live Demo
 
-- **Frontend:** [https://zero-harmer-frontend.onrender.com](https://zero-harmer-frontend.onrender.com)
-- **Backend API:** [https://zero-harmer-backend.onrender.com/api/health](https://zero-harmer-backend.onrender.com/api/health)
+- **Frontend:** [http://13.59.83.134](http://13.59.83.134)
+- **Backend API:** [http://13.59.83.134/api/health](http://13.59.83.134/api/health)
+- **API Docs:** [http://13.59.83.134:8000/docs](http://13.59.83.134:8000/docs)
+- **Default Login:** `admin` / `admin123`
 
-> **Note:** Free tier may spin down after inactivity — allow 30-60s for cold start.
-
-### Render (Free Tier)
+### Docker (Self-Hosted)
 
 The application is configured for deployment on Render using `render.yaml`:
 
