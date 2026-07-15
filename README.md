@@ -305,9 +305,9 @@ zeroharm-ai/
 
 ### Live Demo
 
-- **Frontend:** [http://13.59.83.134](http://13.59.83.134)
-- **Backend API:** [http://13.59.83.134/api/health](http://13.59.83.134/api/health)
-- **API Docs:** [http://13.59.83.134:8000/docs](http://13.59.83.134:8000/docs)
+- **Frontend:** [http://ec2-3-15-255-112.us-east-2.compute.amazonaws.com](http://ec2-3-15-255-112.us-east-2.compute.amazonaws.com)
+- **Backend API:** [http://ec2-3-15-255-112.us-east-2.compute.amazonaws.com/api/health](http://ec2-3-15-255-112.us-east-2.compute.amazonaws.com/api/health)
+- **API Docs:** [http://ec2-3-15-255-112.us-east-2.compute.amazonaws.com:8000/docs](http://ec2-3-15-255-112.us-east-2.compute.amazonaws.com:8000/docs)
 - **Default Login:** `admin` / `admin123`
 
 ### Docker (Self-Hosted)
